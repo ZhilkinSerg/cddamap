@@ -285,7 +285,7 @@ func (o *Overmap) Color(id string) (*image.Uniform, *image.Uniform) {
 	return unset.FG, unset.BG
 }
 
-func sourceFiles(jsonRoot, modsRoot string, saveMods save.Mods) ([]string, error) {
+func sourceFiles(jsonRoot, modsRoot string, saveMods []string) ([]string, error) {
 	files := []string{}
 
 	err := filepath.Walk(jsonRoot, func(path string, info os.FileInfo, err error) error {
@@ -305,7 +305,7 @@ func sourceFiles(jsonRoot, modsRoot string, saveMods save.Mods) ([]string, error
 	}
 
 	activeMods := map[string]string{}
-	for _, m := range saveMods.Mods {
+	for _, m := range saveMods {
 		activeMods[m] = m
 	}
 
@@ -324,7 +324,6 @@ func sourceFiles(jsonRoot, modsRoot string, saveMods save.Mods) ([]string, error
 		if err != nil {
 			return nil, err
 		}
-
 		var modinfo []modInfo
 		err = json.Unmarshal(b, &modinfo)
 		if err != nil {
@@ -335,7 +334,7 @@ func sourceFiles(jsonRoot, modsRoot string, saveMods save.Mods) ([]string, error
 			continue
 		}
 
-		err = filepath.Walk(modInfoPath, func(path string, info os.FileInfo, err error) error {
+		err = filepath.Walk(path.Join(modsRoot, f.Name()), func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				return err
 			}

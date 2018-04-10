@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -13,12 +14,8 @@ import (
 )
 
 type Save struct {
-	Mods    Mods
+	Mods    []string
 	Overmap Overmap
-}
-
-type Mods struct {
-	Mods []string
 }
 
 type Overmap struct {
@@ -59,8 +56,20 @@ func Build(save string) (*Save, error) {
 		return nil, err
 	}
 
+	saveModsPath := path.Join(save, "mods.json")
+	b, err := ioutil.ReadFile(saveModsPath)
+	if err != nil {
+		return nil, err
+	}
+	var mods []string
+	err = json.Unmarshal(b, &mods)
+	if err != nil {
+		return nil, err
+	}
+
 	s := &Save{
 		Overmap: o,
+		Mods:    mods,
 	}
 
 	return s, nil

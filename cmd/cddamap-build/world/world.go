@@ -63,7 +63,7 @@ func Build(m *metadata.Metadata, s *save.Save) (*World, error) {
 	}
 
 	for k, v := range missingTerrain {
-		fmt.Printf("missing terrain\n: %v x %v", k, v)
+		fmt.Printf("missing terrain: %v x %v\n", k, v)
 	}
 
 	cXMax := 0
@@ -96,7 +96,6 @@ func Build(m *metadata.Metadata, s *save.Save) (*World, error) {
 	for _, c := range s.Overmap.Chunks {
 		ci := c.X + (0 - cXMin) + cXSize*(c.Y+0-cYMin)
 		doneChunks[ci] = true
-		fmt.Printf("processing x:%v, y:%v as %v\n", c.X, c.Y, ci)
 		for li, l := range c.Layers {
 			lzp := 0
 			for _, e := range l {
@@ -118,7 +117,6 @@ func Build(m *metadata.Metadata, s *save.Save) (*World, error) {
 	dfg, dbg := m.Overmap.Color("default")
 	for i := 0; i < chunkCapacity; i++ {
 		if _, ok := doneChunks[i]; !ok {
-			fmt.Printf("filling in blank chunk: %v\n", i)
 			for e := 0; e < 680400; e++ {
 				cells[i*680400+e] = Cell{
 					Symbol:  " ",

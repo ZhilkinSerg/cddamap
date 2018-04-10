@@ -4,7 +4,6 @@ import (
 	"os"
 
 	"github.com/jessevdk/go-flags"
-
 	"github.com/ralreegorganon/cddamap/cmd/cddamap-build/metadata"
 	"github.com/ralreegorganon/cddamap/cmd/cddamap-build/render"
 	"github.com/ralreegorganon/cddamap/cmd/cddamap-build/save"
