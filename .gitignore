@@ -1,0 +1,5 @@
+vendor
+build/bin
+build/migrations
+cmd/cddamap-build/cddamap-build
+cmd/cddamap/cddamap
