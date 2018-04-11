@@ -14,8 +14,10 @@ import (
 )
 
 type Save struct {
+	Name    string
 	Mods    []string
 	Overmap Overmap
+	Seen    map[string]Seen
 }
 
 type Overmap struct {
@@ -42,6 +44,23 @@ type TerrainGroup struct {
 	Count            float64
 }
 
+type Seen struct {
+	Character string
+	Chunks    []SeenChunk
+}
+
+type SeenChunk struct {
+	X        int
+	Y        int
+	Visible  [][]SeenGroup `json:"visible"`
+	Explored [][]SeenGroup `json:"explored"`
+}
+
+type SeenGroup struct {
+	Seen  bool
+	Count float64
+}
+
 func (tg *TerrainGroup) UnmarshalJSON(bs []byte) error {
 	arr := []interface{}{}
 	json.Unmarshal(bs, &arr)
@@ -50,8 +69,21 @@ func (tg *TerrainGroup) UnmarshalJSON(bs []byte) error {
 	return nil
 }
 
+func (sg *SeenGroup) UnmarshalJSON(bs []byte) error {
+	arr := []interface{}{}
+	json.Unmarshal(bs, &arr)
+	sg.Seen = arr[0].(bool)
+	sg.Count = arr[1].(float64)
+	return nil
+}
+
 func Build(save string) (*Save, error) {
 	o, err := overmapFromSave(save)
+	if err != nil {
+		return nil, err
+	}
+
+	cs, err := characterSeenFromSave(save)
 	if err != nil {
 		return nil, err
 	}
@@ -67,9 +99,13 @@ func Build(save string) (*Save, error) {
 		return nil, err
 	}
 
+	name := path.Base(save)
+
 	s := &Save{
+		Name:    name,
 		Overmap: o,
 		Mods:    mods,
+		Seen:    cs,
 	}
 
 	return s, nil
@@ -159,6 +195,104 @@ func chunkFileNameToCoordinates(chunkFile string) (int, int, error) {
 		return 0, 0, err
 	}
 	y, err := strconv.Atoi(parts[2])
+	if err != nil {
+		return 0, 0, err
+	}
+	return x, y, nil
+}
+
+func characterSeenFromSave(save string) (map[string]Seen, error) {
+	s := make(map[string]Seen)
+
+	chunkFiles, err := characterSeenChunkFiles(save)
+	if err != nil {
+		return s, err
+	}
+
+	for _, f := range chunkFiles {
+		t, err := ioutil.ReadFile(f)
+		if err != nil {
+			return s, err
+		}
+
+		lines := strings.Split(string(t), "\n")
+
+		if lines[0] != "# version 25" {
+			return s, fmt.Errorf("unsupported version: %v", lines[0])
+		}
+
+		var buffer bytes.Buffer
+		for i := 1; i < len(lines); i++ {
+			buffer.WriteString(lines[i])
+		}
+
+		pruned := buffer.Bytes()
+
+		var chunk SeenChunk
+		err = json.Unmarshal(pruned, &chunk)
+		if err != nil {
+			return s, err
+		}
+
+		parts := strings.Split(path.Base(f), ".")
+		name := parts[0]
+
+		if _, ok := s[name]; !ok {
+			s[name] = Seen{
+				Character: name,
+				Chunks:    make([]SeenChunk, 0),
+			}
+		}
+
+		x, y, err := characterSeenFileNameToCoordinates(f)
+		if err != nil {
+			return s, err
+		}
+		chunk.X = x
+		chunk.Y = y
+
+		seen := s[name]
+		seen.Chunks = append(seen.Chunks, chunk)
+		s[name] = seen
+	}
+
+	return s, nil
+}
+
+func characterSeenChunkFiles(root string) ([]string, error) {
+	files := []string{}
+	re := regexp.MustCompile(`\.seen\.-?\d\.-?\d$`)
+
+	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			return nil
+		}
+
+		isCharacterSeenChunk := re.MatchString(path)
+		if isCharacterSeenChunk {
+			files = append(files, path)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return files, nil
+}
+
+func characterSeenFileNameToCoordinates(chunkFile string) (int, int, error) {
+	_, file := filepath.Split(chunkFile)
+	parts := strings.Split(file, ".")
+	x, err := strconv.Atoi(parts[2])
+	if err != nil {
+		return 0, 0, err
+	}
+	y, err := strconv.Atoi(parts[3])
 	if err != nil {
 		return 0, 0, err
 	}

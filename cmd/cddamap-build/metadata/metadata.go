@@ -285,6 +285,13 @@ func (o *Overmap) Color(id string) (*image.Uniform, *image.Uniform) {
 	return unset.FG, unset.BG
 }
 
+func (o *Overmap) Name(id string) string {
+	if t, tok := o.built[id]; tok {
+		return t.Name
+	}
+	return "?"
+}
+
 func sourceFiles(jsonRoot, modsRoot string, saveMods []string) ([]string, error) {
 	files := []string{}
 

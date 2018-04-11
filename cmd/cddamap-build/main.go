@@ -12,12 +12,13 @@ import (
 )
 
 var opts struct {
-	GameRoot  string `short:"g" long:"game" required:"true" description:"Cataclysm: DDA game root directory"`
-	Save      string `short:"s" long:"save" required:"true" description:"Game save directory to process"`
-	OutputDir string `short:"o" long:"output" required:"true" description:"Output folder"`
-	Text      bool   `short:"t" long:"text" description:"Render to text files"`
-	Images    bool   `short:"i" long:"images" description:"Render to images"`
-	Layers    []int  `short:"l" long:"layer" description:"Layer to render, 0-20. Repeat flag for multiple layers or omit for all."`
+	GameRoot           string `short:"g" long:"game" required:"true" description:"Cataclysm: DDA game root directory"`
+	Save               string `short:"s" long:"save" required:"true" description:"Game save directory to process"`
+	OutputDir          string `short:"o" long:"output" required:"true" description:"Output folder"`
+	Text               bool   `short:"t" long:"text" description:"Render to text files"`
+	Images             bool   `short:"i" long:"images" description:"Render to images"`
+	Layers             []int  `short:"l" long:"layer" description:"Layer to render, 0-20. Repeat flag for multiple layers or omit for all."`
+	DBConnectionString string `short:"c" long:"connectionString" description:"PostGIS database connection string"`
 }
 
 func init() {
@@ -63,6 +64,13 @@ func main() {
 
 	if opts.Images {
 		err = render.Image(w, opts.OutputDir, opts.Layers)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	if opts.DBConnectionString != "" {
+		err = render.GIS(w, opts.DBConnectionString, opts.Layers)
 		if err != nil {
 			log.Fatal(err)
 		}

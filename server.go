@@ -3,6 +3,7 @@ package cddamap
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
@@ -13,6 +14,7 @@ func CreateRouter(server *HTTPServer) (*mux.Router, error) {
 	m := map[string]map[string]HttpApiFunc{
 		"GET": {
 			"/api/worlds": server.GetWorlds,
+			"/api/worlds/{worldID:[0-9]+}/layers/{layerID:[0-9]+}/cells/{x}/{y}": server.GetCells,
 		},
 		"POST": {},
 		"PUT":  {},
@@ -105,5 +107,29 @@ func (s *HTTPServer) GetWorlds(w http.ResponseWriter, r *http.Request, vars map[
 
 	writeJSON(w, http.StatusOK, worlds)
 
+	return nil
+}
+
+func (s *HTTPServer) GetCells(w http.ResponseWriter, r *http.Request, vars map[string]string) error {
+	layerID, err := strconv.Atoi(vars["layerID"])
+	if err != nil {
+		return err
+	}
+
+	x, err := strconv.ParseFloat(vars["x"], 64)
+	if err != nil {
+		return err
+	}
+
+	y, err := strconv.ParseFloat(vars["y"], 64)
+	if err != nil {
+		return err
+	}
+
+	json, err := s.DB.GetCellJson(layerID, x, y)
+	if err != nil {
+		return err
+	}
+	writeJSONDirect(w, http.StatusOK, json)
 	return nil
 }
