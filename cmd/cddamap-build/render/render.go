@@ -206,7 +206,55 @@ func seenToImage(w *world.World, outputRoot string, layerID int) error {
 	return nil
 }
 
-func Image(w *world.World, outputRoot string, includeLayers []int, terrain, seen bool) error {
+func seenToImageSolid(w *world.World, outputRoot string, layerID int) error {
+	for name, layers := range w.SeenLayers {
+		l := layers[layerID]
+
+		width := int(cellWidth * float64(len(l.SeenRows[0].SeenCells)))
+		height := cellHeight * len(l.SeenRows)
+		rgba := image.NewRGBA(image.Rect(0, 0, width, height))
+		draw.Draw(rgba, rgba.Bounds(), image.Black, image.ZP, draw.Src)
+		c := freetype.NewContext()
+		c.SetDPI(dpi)
+		c.SetFont(mapFont)
+		c.SetFontSize(size)
+		c.SetClip(rgba.Bounds())
+		c.SetDst(rgba)
+		c.SetHinting(font.HintingNone)
+
+		pt := freetype.Pt(0, 0+int(c.PointToFixed(size)>>6))
+		for _, r := range l.SeenRows {
+			for _, cell := range r.SeenCells {
+				draw.Draw(rgba, image.Rect(int(pt.X>>6), int(pt.Y>>6), int(pt.X>>6)+cellOverprintWidth, int(pt.Y>>6)-cellHeight), cell.ColorBG, image.ZP, draw.Src)
+				pt.X += c.PointToFixed(cellWidth)
+			}
+			pt.X = c.PointToFixed(0)
+			pt.Y += c.PointToFixed(size * spacing)
+		}
+
+		filename := filepath.Join(outputRoot, fmt.Sprintf("%v_visible_solid_%v.png", name, layerID))
+		outFile, err := os.Create(filename)
+		if err != nil {
+			return err
+		}
+		defer outFile.Close()
+
+		b := bufio.NewWriter(outFile)
+		err = png.Encode(b, rgba)
+		if err != nil {
+			return err
+		}
+
+		err = b.Flush()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func Image(w *world.World, outputRoot string, includeLayers []int, terrain, seen, seenSolid bool) error {
 	err := os.MkdirAll(outputRoot, os.ModePerm)
 	if err != nil {
 		return err
@@ -217,8 +265,13 @@ func Image(w *world.World, outputRoot string, includeLayers []int, terrain, seen
 			terrainToImage(w, outputRoot, layerID)
 
 		}
+
 		if seen {
 			seenToImage(w, outputRoot, layerID)
+
+			if seenSolid {
+				seenToImageSolid(w, outputRoot, layerID)
+			}
 		}
 	}
 

@@ -21,6 +21,7 @@ var opts struct {
 	DBConnectionString string `short:"c" long:"connectionString" description:"PostGIS database connection string"`
 	Terrain            bool   `short:"r" long:"terrain" description:"Render terrain"`
 	Seen               bool   `short:"e" long:"seen" description:"Render seen"`
+	SeenSolid          bool   `short:"d" long:"seensolid" description:"Render seen as a solid overlay"`
 }
 
 func init() {
@@ -65,7 +66,7 @@ func main() {
 	}
 
 	if opts.Images {
-		err = render.Image(w, opts.OutputDir, opts.Layers, opts.Terrain, opts.Seen)
+		err = render.Image(w, opts.OutputDir, opts.Layers, opts.Terrain, opts.Seen, opts.SeenSolid)
 		if err != nil {
 			log.Fatal(err)
 		}
