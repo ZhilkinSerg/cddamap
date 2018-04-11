@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"image"
+	"image/color"
 	"image/draw"
 	"image/png"
 	"os"
@@ -26,6 +27,7 @@ var cellWidth = 21.3594
 var cellHeight = 24
 var cellOverprintWidth = 22
 var mapFont *truetype.Font
+var colorCache map[color.RGBA]*image.Uniform
 
 func init() {
 	fontBytes, err := Asset("Topaz-8.ttf")
@@ -37,9 +39,11 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
+
+	colorCache = make(map[color.RGBA]*image.Uniform)
 }
 
-func terrainToText(w *world.World, outputRoot string, layerID int) error {
+func terrainToText(w world.World, outputRoot string, layerID int) error {
 	l := w.TerrainLayers[layerID]
 	filename := filepath.Join(outputRoot, fmt.Sprintf("o_%v", layerID))
 	f, err := os.Create(filename)
@@ -59,7 +63,7 @@ func terrainToText(w *world.World, outputRoot string, layerID int) error {
 	return nil
 }
 
-func seenToText(w *world.World, outputRoot string, layerID int) error {
+func seenToText(w world.World, outputRoot string, layerID int) error {
 	for name, layers := range w.SeenLayers {
 		l := layers[layerID]
 		filename := filepath.Join(outputRoot, fmt.Sprintf("%v_visible_%v", name, layerID))
@@ -85,7 +89,7 @@ func seenToText(w *world.World, outputRoot string, layerID int) error {
 	return nil
 }
 
-func Text(w *world.World, outputRoot string, includeLayers []int, terrain, seen bool) error {
+func Text(w world.World, outputRoot string, includeLayers []int, terrain, seen bool) error {
 	err := os.MkdirAll(outputRoot, os.ModePerm)
 	if err != nil {
 		return err
@@ -108,7 +112,7 @@ func Text(w *world.World, outputRoot string, includeLayers []int, terrain, seen 
 	return nil
 }
 
-func terrainToImage(w *world.World, outputRoot string, layerID int) error {
+func terrainToImage(w world.World, outputRoot string, layerID int) error {
 	l := w.TerrainLayers[layerID]
 
 	width := int(cellWidth * float64(len(l.TerrainRows[0].TerrainCells)))
@@ -126,8 +130,20 @@ func terrainToImage(w *world.World, outputRoot string, layerID int) error {
 	pt := freetype.Pt(0, 0+int(c.PointToFixed(size)>>6))
 	for _, r := range l.TerrainRows {
 		for _, cell := range r.TerrainCells {
-			draw.Draw(rgba, image.Rect(int(pt.X>>6), int(pt.Y>>6), int(pt.X>>6)+cellOverprintWidth, int(pt.Y>>6)-cellHeight), cell.ColorBG, image.ZP, draw.Src)
-			c.SetSrc(cell.ColorFG)
+			bg, ok := colorCache[cell.ColorBG]
+			if !ok {
+				bg = image.NewUniform(cell.ColorBG)
+				colorCache[cell.ColorBG] = bg
+			}
+
+			fg, ok := colorCache[cell.ColorFG]
+			if !ok {
+				fg = image.NewUniform(cell.ColorFG)
+				colorCache[cell.ColorFG] = fg
+			}
+
+			draw.Draw(rgba, image.Rect(int(pt.X>>6), int(pt.Y>>6), int(pt.X>>6)+cellOverprintWidth, int(pt.Y>>6)-cellHeight), bg, image.ZP, draw.Src)
+			c.SetSrc(fg)
 			c.DrawString(cell.Symbol, pt)
 			pt.X += c.PointToFixed(cellWidth)
 		}
@@ -156,7 +172,7 @@ func terrainToImage(w *world.World, outputRoot string, layerID int) error {
 	return nil
 }
 
-func seenToImage(w *world.World, outputRoot string, layerID int) error {
+func seenToImage(w world.World, outputRoot string, layerID int) error {
 	for name, layers := range w.SeenLayers {
 		l := layers[layerID]
 
@@ -175,8 +191,20 @@ func seenToImage(w *world.World, outputRoot string, layerID int) error {
 		pt := freetype.Pt(0, 0+int(c.PointToFixed(size)>>6))
 		for _, r := range l.SeenRows {
 			for _, cell := range r.SeenCells {
-				draw.Draw(rgba, image.Rect(int(pt.X>>6), int(pt.Y>>6), int(pt.X>>6)+cellOverprintWidth, int(pt.Y>>6)-cellHeight), cell.ColorBG, image.ZP, draw.Src)
-				c.SetSrc(cell.ColorFG)
+				bg, ok := colorCache[cell.ColorBG]
+				if !ok {
+					bg = image.NewUniform(cell.ColorBG)
+					colorCache[cell.ColorBG] = bg
+				}
+
+				fg, ok := colorCache[cell.ColorFG]
+				if !ok {
+					fg = image.NewUniform(cell.ColorFG)
+					colorCache[cell.ColorFG] = fg
+				}
+
+				draw.Draw(rgba, image.Rect(int(pt.X>>6), int(pt.Y>>6), int(pt.X>>6)+cellOverprintWidth, int(pt.Y>>6)-cellHeight), bg, image.ZP, draw.Src)
+				c.SetSrc(fg)
 				c.DrawString(cell.Symbol, pt)
 				pt.X += c.PointToFixed(cellWidth)
 			}
@@ -206,7 +234,7 @@ func seenToImage(w *world.World, outputRoot string, layerID int) error {
 	return nil
 }
 
-func seenToImageSolid(w *world.World, outputRoot string, layerID int) error {
+func seenToImageSolid(w world.World, outputRoot string, layerID int) error {
 	for name, layers := range w.SeenLayers {
 		l := layers[layerID]
 
@@ -225,7 +253,13 @@ func seenToImageSolid(w *world.World, outputRoot string, layerID int) error {
 		pt := freetype.Pt(0, 0+int(c.PointToFixed(size)>>6))
 		for _, r := range l.SeenRows {
 			for _, cell := range r.SeenCells {
-				draw.Draw(rgba, image.Rect(int(pt.X>>6), int(pt.Y>>6), int(pt.X>>6)+cellOverprintWidth, int(pt.Y>>6)-cellHeight), cell.ColorBG, image.ZP, draw.Src)
+				bg, ok := colorCache[cell.ColorBG]
+				if !ok {
+					bg = image.NewUniform(cell.ColorBG)
+					colorCache[cell.ColorBG] = bg
+				}
+
+				draw.Draw(rgba, image.Rect(int(pt.X>>6), int(pt.Y>>6), int(pt.X>>6)+cellOverprintWidth, int(pt.Y>>6)-cellHeight), bg, image.ZP, draw.Src)
 				pt.X += c.PointToFixed(cellWidth)
 			}
 			pt.X = c.PointToFixed(0)
@@ -254,7 +288,7 @@ func seenToImageSolid(w *world.World, outputRoot string, layerID int) error {
 	return nil
 }
 
-func Image(w *world.World, outputRoot string, includeLayers []int, terrain, seen, seenSolid bool) error {
+func Image(w world.World, outputRoot string, includeLayers []int, terrain, seen, seenSolid bool) error {
 	err := os.MkdirAll(outputRoot, os.ModePerm)
 	if err != nil {
 		return err
@@ -278,7 +312,7 @@ func Image(w *world.World, outputRoot string, includeLayers []int, terrain, seen
 	return nil
 }
 
-func GIS(w *world.World, connectionString string, includeLayers []int, terrain, seen bool) error {
+func GIS(w world.World, connectionString string, includeLayers []int, terrain, seen bool) error {
 	db, err := sqlx.Open("postgres", connectionString)
 	if err != nil {
 		return err

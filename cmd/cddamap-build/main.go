@@ -32,6 +32,9 @@ func init() {
 }
 
 func main() {
+	// defer profile.Start().Stop()
+	// defer profile.Start(profile.MemProfile).Stop()
+
 	_, err := flags.Parse(&opts)
 	if err != nil {
 		os.Exit(1)
@@ -48,12 +51,12 @@ func main() {
 		log.Fatal(err)
 	}
 
-	m, err := metadata.Build(s, opts.GameRoot)
+	o, err := metadata.Build(s, opts.GameRoot)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	w, err := world.Build(m, s)
+	w, err := world.Build(o, s)
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -2,7 +2,6 @@ package world
 
 import (
 	"fmt"
-	"image"
 	"image/color"
 
 	"github.com/ralreegorganon/cddamap/cmd/cddamap-build/metadata"
@@ -46,8 +45,8 @@ type TerrainRow struct {
 
 type TerrainCell struct {
 	Symbol  string
-	ColorFG *image.Uniform
-	ColorBG *image.Uniform
+	ColorFG color.RGBA
+	ColorBG color.RGBA
 	Name    string
 	ID      string
 }
@@ -63,15 +62,15 @@ type SeenRow struct {
 type SeenCell struct {
 	Symbol  string
 	Seen    bool
-	ColorFG *image.Uniform
-	ColorBG *image.Uniform
+	ColorFG color.RGBA
+	ColorBG color.RGBA
 }
 
-func Build(m *metadata.Metadata, s *save.Save) (*World, error) {
+func Build(m metadata.Overmap, s save.Save) (World, error) {
 	terrainLayers := buildTerrainLayers(m, s)
 	characterSeenLayers := buildCharacterSeenLayers(m, s)
 
-	world := &World{
+	world := World{
 		Name:          s.Name,
 		TerrainLayers: terrainLayers,
 		SeenLayers:    characterSeenLayers,
@@ -89,7 +88,7 @@ type worldChunkDimensions struct {
 	YMax  int
 }
 
-func calculateWorldChunkDimensions(m *metadata.Metadata, s *save.Save) worldChunkDimensions {
+func calculateWorldChunkDimensions(m metadata.Overmap, s save.Save) worldChunkDimensions {
 	cXMax := 0
 	cXMin := 0
 	cYMax := 0
@@ -124,11 +123,12 @@ func calculateWorldChunkDimensions(m *metadata.Metadata, s *save.Save) worldChun
 	return wcd
 }
 
-func buildCharacterSeenLayers(m *metadata.Metadata, s *save.Save) map[string][]SeenLayer {
+func buildCharacterSeenLayers(m metadata.Overmap, s save.Save) map[string][]SeenLayer {
 	wcd := calculateWorldChunkDimensions(m, s)
 	chunkCapacity := wcd.XSize * wcd.YSize
-	dfg := image.NewUniform(color.RGBA{44, 44, 44, 255})
-	dbg := image.NewUniform(color.RGBA{0, 0, 0, 255})
+	dfg := color.RGBA{44, 44, 44, 255}
+	dbg := color.RGBA{0, 0, 0, 255}
+	transparent := color.RGBA{0, 0, 0, 0}
 
 	seen := make(map[string][]SeenLayer)
 
@@ -148,8 +148,8 @@ func buildCharacterSeenLayers(m *metadata.Metadata, s *save.Save) map[string][]S
 							cells[tmi] = SeenCell{
 								Symbol:  " ",
 								Seen:    true,
-								ColorFG: image.Transparent,
-								ColorBG: image.Transparent,
+								ColorFG: transparent,
+								ColorBG: transparent,
 							}
 						} else {
 							cells[tmi] = SeenCell{
@@ -204,12 +204,12 @@ func buildCharacterSeenLayers(m *metadata.Metadata, s *save.Save) map[string][]S
 	return seen
 }
 
-func buildTerrainLayers(m *metadata.Metadata, s *save.Save) []TerrainLayer {
+func buildTerrainLayers(m metadata.Overmap, s save.Save) []TerrainLayer {
 	missingTerrain := make(map[string]int)
 	for _, c := range s.Overmap.Chunks {
 		for _, l := range c.Layers {
 			for _, e := range l {
-				if exists := m.Overmap.Exists(e.OvermapTerrainID); !exists {
+				if exists := m.Exists(e.OvermapTerrainID); !exists {
 					if _, ok := missingTerrain[e.OvermapTerrainID]; !ok {
 						missingTerrain[e.OvermapTerrainID] = 0
 					}
@@ -234,9 +234,9 @@ func buildTerrainLayers(m *metadata.Metadata, s *save.Save) []TerrainLayer {
 		for li, l := range c.Layers {
 			lzp := 0
 			for _, e := range l {
-				s := m.Overmap.Symbol(e.OvermapTerrainID)
-				cfg, cbg := m.Overmap.Color(e.OvermapTerrainID)
-				n := m.Overmap.Name(e.OvermapTerrainID)
+				s := m.Symbol(e.OvermapTerrainID)
+				cfg, cbg := m.Color(e.OvermapTerrainID)
+				n := m.Name(e.OvermapTerrainID)
 
 				for i := 0; i < int(e.Count); i++ {
 					tmi := ci*680400 + li*32400 + lzp
@@ -253,7 +253,7 @@ func buildTerrainLayers(m *metadata.Metadata, s *save.Save) []TerrainLayer {
 		}
 	}
 
-	dfg, dbg := m.Overmap.Color("default")
+	dfg, dbg := m.Color("default")
 	for i := 0; i < chunkCapacity; i++ {
 		if _, ok := doneChunks[i]; !ok {
 			for e := 0; e < 680400; e++ {

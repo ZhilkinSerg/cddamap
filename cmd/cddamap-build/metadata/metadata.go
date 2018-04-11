@@ -3,9 +3,7 @@ package metadata
 import (
 	"bytes"
 	"encoding/json"
-	"image"
 	"image/color"
-	"io"
 	"io/ioutil"
 	"os"
 	"path"
@@ -17,13 +15,6 @@ import (
 	"github.com/ralreegorganon/cddamap/cmd/cddamap-build/save"
 	log "github.com/sirupsen/logrus"
 )
-
-type Overmap struct {
-	templates map[string]overmapTerrain
-	built     map[string]overmapTerrain
-	symbols   map[int]string
-	rotations [][]int
-}
 
 type overmapTerrain struct {
 	ID         string   `json:"id"`
@@ -135,8 +126,8 @@ var symbols map[int]string
 var rotations [][]int
 
 type ColorPair struct {
-	FG *image.Uniform
-	BG *image.Uniform
+	FG color.RGBA
+	BG color.RGBA
 }
 
 var colors map[string]ColorPair
@@ -166,22 +157,22 @@ func init() {
 	rotations = append(rotations, []int{4194417, 4194424, 4194417, 4194424})
 	rotations = append(rotations, []int{4194420, 4194423, 4194421, 4194422})
 
-	white := image.NewUniform(color.RGBA{150, 150, 150, 255})
-	black := image.NewUniform(color.RGBA{0, 0, 0, 255})
-	red := image.NewUniform(color.RGBA{255, 0, 0, 255})
-	green := image.NewUniform(color.RGBA{0, 110, 0, 255})
-	brown := image.NewUniform(color.RGBA{92, 51, 23, 255})
-	blue := image.NewUniform(color.RGBA{0, 0, 200, 255})
-	magenta := image.NewUniform(color.RGBA{139, 58, 98, 255})
-	cyan := image.NewUniform(color.RGBA{0, 150, 180, 255})
-	gray := image.NewUniform(color.RGBA{150, 150, 150, 255})
-	darkGray := image.NewUniform(color.RGBA{99, 99, 99, 255})
-	lightRed := image.NewUniform(color.RGBA{255, 150, 150, 255})
-	lightGreen := image.NewUniform(color.RGBA{0, 255, 0, 255})
-	yellow := image.NewUniform(color.RGBA{255, 255, 0, 255})
-	lightBlue := image.NewUniform(color.RGBA{100, 100, 255, 255})
-	lightMagenta := image.NewUniform(color.RGBA{254, 0, 254, 255})
-	lightCyan := image.NewUniform(color.RGBA{0, 240, 255, 255})
+	white := color.RGBA{150, 150, 150, 255}
+	black := color.RGBA{0, 0, 0, 255}
+	red := color.RGBA{255, 0, 0, 255}
+	green := color.RGBA{0, 110, 0, 255}
+	brown := color.RGBA{92, 51, 23, 255}
+	blue := color.RGBA{0, 0, 200, 255}
+	magenta := color.RGBA{139, 58, 98, 255}
+	cyan := color.RGBA{0, 150, 180, 255}
+	gray := color.RGBA{150, 150, 150, 255}
+	darkGray := color.RGBA{99, 99, 99, 255}
+	lightRed := color.RGBA{255, 150, 150, 255}
+	lightGreen := color.RGBA{0, 255, 0, 255}
+	yellow := color.RGBA{255, 255, 0, 255}
+	lightBlue := color.RGBA{100, 100, 255, 255}
+	lightMagenta := color.RGBA{254, 0, 254, 255}
+	lightCyan := color.RGBA{0, 240, 255, 255}
 
 	colors = make(map[string]ColorPair)
 
@@ -227,55 +218,25 @@ func init() {
 	colors["unset"] = ColorPair{FG: white, BG: black}
 }
 
-type Metadata struct {
-	Overmap Overmap
+type Overmap struct {
+	built map[string]overmapTerrain
 }
 
-func Build(save *save.Save, gameRoot string) (*Metadata, error) {
-	m := &Metadata{
-		Overmap: Overmap{
-			templates: make(map[string]overmapTerrain),
-			built:     make(map[string]overmapTerrain),
-			symbols:   symbols,
-			rotations: rotations,
-		},
-	}
-
-	jsonRoot := path.Join(gameRoot, "data", "json")
-	modsRoot := path.Join(gameRoot, "data", "mods")
-	files, err := sourceFiles(jsonRoot, modsRoot, save.Mods)
-	if err != nil {
-		return nil, err
-	}
-
-	err = m.Overmap.loadTemplatesFromFiles(files)
-	if err != nil {
-		return nil, err
-	}
-
-	err = m.Overmap.buildTemplates()
-	if err != nil {
-		return nil, err
-	}
-
-	return m, nil
-}
-
-func (o *Overmap) Exists(id string) bool {
+func (o Overmap) Exists(id string) bool {
 	_, ok := o.built[id]
 	return ok
 }
 
-func (o *Overmap) Symbol(id string) string {
+func (o Overmap) Symbol(id string) string {
 	if t, tok := o.built[id]; tok {
-		if s, sok := o.symbols[t.Sym]; sok {
+		if s, sok := symbols[t.Sym]; sok {
 			return s
 		}
 	}
 	return "?"
 }
 
-func (o *Overmap) Color(id string) (*image.Uniform, *image.Uniform) {
+func (o Overmap) Color(id string) (color.RGBA, color.RGBA) {
 	if c, tok := o.built[id]; tok {
 		if cp, ok := colors[c.Color]; ok {
 			return cp.FG, cp.BG
@@ -285,11 +246,41 @@ func (o *Overmap) Color(id string) (*image.Uniform, *image.Uniform) {
 	return unset.FG, unset.BG
 }
 
-func (o *Overmap) Name(id string) string {
+func (o Overmap) Name(id string) string {
 	if t, tok := o.built[id]; tok {
 		return t.Name
 	}
 	return "?"
+}
+
+func Build(save save.Save, gameRoot string) (Overmap, error) {
+	o := Overmap{}
+
+	jsonRoot := path.Join(gameRoot, "data", "json")
+	modsRoot := path.Join(gameRoot, "data", "mods")
+	files, err := sourceFiles(jsonRoot, modsRoot, save.Mods)
+	if err != nil {
+		return o, err
+	}
+
+	templates := make(map[string]overmapTerrain)
+	for _, f := range files {
+		err = loadTemplates(f, templates)
+		if err != nil {
+			return o, err
+		}
+	}
+
+	built, err := buildTemplates(templates)
+	if err != nil {
+		return o, err
+	}
+
+	o = Overmap{
+		built: built,
+	}
+
+	return o, nil
 }
 
 func sourceFiles(jsonRoot, modsRoot string, saveMods []string) ([]string, error) {
@@ -360,8 +351,14 @@ func sourceFiles(jsonRoot, modsRoot string, saveMods []string) ([]string, error)
 	return files, nil
 }
 
-func (o *Overmap) loadTemplates(r io.Reader) error {
-	b, err := ioutil.ReadAll(r)
+func loadTemplates(file string, templates map[string]overmapTerrain) error {
+	f, err := os.Open(file)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	b, err := ioutil.ReadAll(f)
 	if err != nil {
 		return err
 	}
@@ -399,50 +396,38 @@ func (o *Overmap) loadTemplates(r io.Reader) error {
 			continue
 		}
 		if ot.Abstract != "" {
-			o.templates[ot.Abstract] = ot
+			templates[ot.Abstract] = ot
 		} else {
-			o.templates[ot.ID] = ot
+			templates[ot.ID] = ot
 		}
 	}
 
 	return nil
 }
 
-func (o *Overmap) loadTemplatesFromFiles(files []string) error {
-	for _, f := range files {
-		f, err := os.Open(f)
-		if err != nil {
-			return err
-		}
-		defer f.Close()
+func buildTemplates(templates map[string]overmapTerrain) (map[string]overmapTerrain, error) {
+	built := make(map[string]overmapTerrain)
 
-		o.loadTemplates(f)
-	}
-
-	return nil
-}
-
-func (o *Overmap) buildTemplates() error {
-	for _, ot := range o.templates {
+	for _, ot := range templates {
 		bt := make([]overmapTerrain, 0)
 		t := ot
 		bt = append(bt, t)
 		for t.CopyFrom != "" {
-			t = o.templates[t.CopyFrom]
+			t = templates[t.CopyFrom]
 			bt = append(bt, t)
 		}
 
 		b := overmapTerrain{}
 		for i := len(bt) - 1; i >= 0; i-- {
 			if err := mergo.Merge(&b, bt[i], mergo.WithOverride); err != nil {
-				return err
+				return built, err
 			}
 		}
 
 		if ot.Abstract == "" {
 			b.Abstract = ""
 			b.CopyFrom = ""
-			o.built[b.ID] = b
+			built[b.ID] = b
 
 			rotate := true
 
@@ -454,11 +439,11 @@ func (o *Overmap) buildTemplates() error {
 						for _, suffix := range linearSuffixes {
 							bs := overmapTerrain{}
 							if err := mergo.Merge(&bs, b, mergo.WithOverride); err != nil {
-								return err
+								return built, err
 							}
 							bs.ID = b.ID + suffix
 							bs.Sym = linearSuffixSymbols[suffix]
-							o.built[bs.ID] = bs
+							built[bs.ID] = bs
 						}
 					}
 				}
@@ -472,18 +457,18 @@ func (o *Overmap) buildTemplates() error {
 					}
 					bs.ID = b.ID + suffix
 
-					for _, r := range o.rotations {
+					for _, r := range rotations {
 						index := indexOf(r, b.Sym)
 						if index != -1 {
 							bs.Sym = r[(i+index+4)%4]
 							break
 						}
 					}
-					o.built[bs.ID] = bs
+					built[bs.ID] = bs
 				}
 			}
 		}
 	}
 
-	return nil
+	return built, nil
 }

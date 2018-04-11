@@ -77,31 +77,33 @@ func (sg *SeenGroup) UnmarshalJSON(bs []byte) error {
 	return nil
 }
 
-func Build(save string) (*Save, error) {
+func Build(save string) (Save, error) {
+	s := Save{}
+
 	o, err := overmapFromSave(save)
 	if err != nil {
-		return nil, err
+		return s, err
 	}
 
 	cs, err := characterSeenFromSave(save)
 	if err != nil {
-		return nil, err
+		return s, err
 	}
 
 	saveModsPath := path.Join(save, "mods.json")
 	b, err := ioutil.ReadFile(saveModsPath)
 	if err != nil {
-		return nil, err
+		return s, err
 	}
 	var mods []string
 	err = json.Unmarshal(b, &mods)
 	if err != nil {
-		return nil, err
+		return s, err
 	}
 
 	name := path.Base(save)
 
-	s := &Save{
+	s = Save{
 		Name:    name,
 		Overmap: o,
 		Mods:    mods,
