@@ -153,7 +153,7 @@ func buildCharacterSeenLayers(m *metadata.Metadata, s *save.Save) map[string][]S
 							}
 						} else {
 							cells[tmi] = SeenCell{
-								Symbol:  "#",
+								Symbol:  " ",
 								Seen:    false,
 								ColorFG: dfg,
 								ColorBG: dbg,
@@ -170,7 +170,7 @@ func buildCharacterSeenLayers(m *metadata.Metadata, s *save.Save) map[string][]S
 			if _, ok := doneChunks[i]; !ok {
 				for e := 0; e < 680400; e++ {
 					cells[i*680400+e] = SeenCell{
-						Symbol:  "#",
+						Symbol:  " ",
 						Seen:    false,
 						ColorFG: dfg,
 						ColorBG: dbg,

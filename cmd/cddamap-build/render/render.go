@@ -85,21 +85,24 @@ func seenToText(w *world.World, outputRoot string, layerID int) error {
 	return nil
 }
 
-func Text(w *world.World, outputRoot string, includeLayers []int) error {
+func Text(w *world.World, outputRoot string, includeLayers []int, terrain, seen bool) error {
 	err := os.MkdirAll(outputRoot, os.ModePerm)
 	if err != nil {
 		return err
 	}
 
 	for _, layerID := range includeLayers {
-		err := terrainToText(w, outputRoot, layerID)
-		if err != nil {
-			return err
+		if terrain {
+			err := terrainToText(w, outputRoot, layerID)
+			if err != nil {
+				return err
+			}
 		}
-
-		err = seenToText(w, outputRoot, layerID)
-		if err != nil {
-			return err
+		if seen {
+			err = seenToText(w, outputRoot, layerID)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -203,21 +206,26 @@ func seenToImage(w *world.World, outputRoot string, layerID int) error {
 	return nil
 }
 
-func Image(w *world.World, outputRoot string, includeLayers []int) error {
+func Image(w *world.World, outputRoot string, includeLayers []int, terrain, seen bool) error {
 	err := os.MkdirAll(outputRoot, os.ModePerm)
 	if err != nil {
 		return err
 	}
 
 	for _, layerID := range includeLayers {
-		terrainToImage(w, outputRoot, layerID)
-		seenToImage(w, outputRoot, layerID)
+		if terrain {
+			terrainToImage(w, outputRoot, layerID)
+
+		}
+		if seen {
+			seenToImage(w, outputRoot, layerID)
+		}
 	}
 
 	return nil
 }
 
-func GIS(w *world.World, connectionString string, includeLayers []int) error {
+func GIS(w *world.World, connectionString string, includeLayers []int, terrain, seen bool) error {
 	db, err := sqlx.Open("postgres", connectionString)
 	if err != nil {
 		return err
@@ -236,45 +244,47 @@ func GIS(w *world.World, connectionString string, includeLayers []int) error {
 			return err
 		}
 
-		txn, err := db.Begin()
-		if err != nil {
-			return err
-		}
+		if terrain {
+			txn, err := db.Begin()
+			if err != nil {
+				return err
+			}
 
-		stmt, err := txn.Prepare(pq.CopyIn("cell", "layer_id", "id", "name", "the_geom"))
-		if err != nil {
-			return err
-		}
+			stmt, err := txn.Prepare(pq.CopyIn("cell", "layer_id", "id", "name", "the_geom"))
+			if err != nil {
+				return err
+			}
 
-		l := w.TerrainLayers[i]
+			l := w.TerrainLayers[i]
 
-		for ri, r := range l.TerrainRows {
-			for ci, c := range r.TerrainCells {
-				x := float64(ci) * 21.3594
-				y := float64(ri) * 24.0
-				x2 := x + 21.3594
-				y2 := y + 24.0
+			for ri, r := range l.TerrainRows {
+				for ci, c := range r.TerrainCells {
+					x := float64(ci) * 21.3594
+					y := float64(ri) * 24.0
+					x2 := x + 21.3594
+					y2 := y + 24.0
 
-				geom := fmt.Sprintf("POLYGON((%[1]f %[2]f, %[3]f %[4]f, %[5]f %[6]f, %[7]f %[8]f, %[1]f %[2]f))", x, y, x2, y, x2, y2, x, y2)
-				_, err = stmt.Exec(layerID, c.ID, c.Name, geom)
-				if err != nil {
-					return err
+					geom := fmt.Sprintf("POLYGON((%[1]f %[2]f, %[3]f %[4]f, %[5]f %[6]f, %[7]f %[8]f, %[1]f %[2]f))", x, y, x2, y, x2, y2, x, y2)
+					_, err = stmt.Exec(layerID, c.ID, c.Name, geom)
+					if err != nil {
+						return err
+					}
 				}
 			}
-		}
-		_, err = stmt.Exec()
-		if err != nil {
-			return err
-		}
+			_, err = stmt.Exec()
+			if err != nil {
+				return err
+			}
 
-		err = stmt.Close()
-		if err != nil {
-			return err
-		}
+			err = stmt.Close()
+			if err != nil {
+				return err
+			}
 
-		err = txn.Commit()
-		if err != nil {
-			return err
+			err = txn.Commit()
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil

@@ -19,6 +19,8 @@ var opts struct {
 	Images             bool   `short:"i" long:"images" description:"Render to images"`
 	Layers             []int  `short:"l" long:"layer" description:"Layer to render, 0-20. Repeat flag for multiple layers or omit for all."`
 	DBConnectionString string `short:"c" long:"connectionString" description:"PostGIS database connection string"`
+	Terrain            bool   `short:"r" long:"terrain" description:"Render terrain"`
+	Seen               bool   `short:"e" long:"seen" description:"Render seen"`
 }
 
 func init() {
@@ -56,21 +58,21 @@ func main() {
 	}
 
 	if opts.Text {
-		err = render.Text(w, opts.OutputDir, opts.Layers)
+		err = render.Text(w, opts.OutputDir, opts.Layers, opts.Terrain, opts.Seen)
 		if err != nil {
 			log.Fatal(err)
 		}
 	}
 
 	if opts.Images {
-		err = render.Image(w, opts.OutputDir, opts.Layers)
+		err = render.Image(w, opts.OutputDir, opts.Layers, opts.Terrain, opts.Seen)
 		if err != nil {
 			log.Fatal(err)
 		}
 	}
 
 	if opts.DBConnectionString != "" {
-		err = render.GIS(w, opts.DBConnectionString, opts.Layers)
+		err = render.GIS(w, opts.DBConnectionString, opts.Layers, opts.Terrain, opts.Seen)
 		if err != nil {
 			log.Fatal(err)
 		}
