@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -90,7 +89,7 @@ func Build(save string) (Save, error) {
 		return s, err
 	}
 
-	saveModsPath := path.Join(save, "mods.json")
+	saveModsPath := filepath.Join(save, "mods.json")
 	b, err := ioutil.ReadFile(saveModsPath)
 	if err != nil {
 		return s, err
@@ -101,7 +100,7 @@ func Build(save string) (Save, error) {
 		return s, err
 	}
 
-	name := path.Base(save)
+	name := filepath.Base(save)
 
 	s = Save{
 		Name:    name,
@@ -236,7 +235,7 @@ func characterSeenFromSave(save string) (map[string]Seen, error) {
 			return s, err
 		}
 
-		parts := strings.Split(path.Base(f), ".")
+		parts := strings.Split(filepath.Base(f), ".")
 		name := parts[0]
 
 		if _, ok := s[name]; !ok {

@@ -256,8 +256,8 @@ func (o Overmap) Name(id string) string {
 func Build(save save.Save, gameRoot string) (Overmap, error) {
 	o := Overmap{}
 
-	jsonRoot := path.Join(gameRoot, "data", "json")
-	modsRoot := path.Join(gameRoot, "data", "mods")
+	jsonRoot := filepath.Join(gameRoot, "data", "json")
+	modsRoot := filepath.Join(gameRoot, "data", "mods")
 	files, err := sourceFiles(jsonRoot, modsRoot, save.Mods)
 	if err != nil {
 		return o, err
@@ -317,7 +317,7 @@ func sourceFiles(jsonRoot, modsRoot string, saveMods []string) ([]string, error)
 			continue
 		}
 
-		modInfoPath := path.Join(modsRoot, f.Name(), "modinfo.json")
+		modInfoPath := filepath.Join(modsRoot, f.Name(), "modinfo.json")
 		b, err := ioutil.ReadFile(modInfoPath)
 		if err != nil {
 			return nil, err
