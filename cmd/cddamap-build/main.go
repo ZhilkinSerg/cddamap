@@ -3,6 +3,9 @@ package main
 import (
 	"os"
 
+	"net/http"
+	_ "net/http/pprof"
+
 	"github.com/jessevdk/go-flags"
 	"github.com/ralreegorganon/cddamap/cmd/cddamap-build/metadata"
 	"github.com/ralreegorganon/cddamap/cmd/cddamap-build/render"
@@ -22,6 +25,7 @@ var opts struct {
 	Terrain            bool   `short:"r" long:"terrain" description:"Render terrain"`
 	Seen               bool   `short:"e" long:"seen" description:"Render seen"`
 	SeenSolid          bool   `short:"d" long:"seensolid" description:"Render seen as a solid overlay"`
+	SkipEmpty          bool   `short:"k" long:"skipempty" description:"Skip rendering empty layers"`
 }
 
 func init() {
@@ -34,6 +38,9 @@ func init() {
 func main() {
 	// defer profile.Start().Stop()
 	// defer profile.Start(profile.MemProfile).Stop()
+	go func() {
+		http.ListenAndServe(":8080", nil)
+	}()
 
 	_, err := flags.Parse(&opts)
 	if err != nil {
@@ -62,21 +69,21 @@ func main() {
 	}
 
 	if opts.Text {
-		err = render.Text(w, opts.OutputDir, opts.Layers, opts.Terrain, opts.Seen)
+		err = render.Text(w, opts.OutputDir, opts.Layers, opts.Terrain, opts.Seen, opts.SkipEmpty)
 		if err != nil {
 			log.Fatal(err)
 		}
 	}
 
 	if opts.Images {
-		err = render.Image(w, opts.OutputDir, opts.Layers, opts.Terrain, opts.Seen, opts.SeenSolid)
+		err = render.Image(w, opts.OutputDir, opts.Layers, opts.Terrain, opts.Seen, opts.SeenSolid, opts.SkipEmpty)
 		if err != nil {
 			log.Fatal(err)
 		}
 	}
 
 	if opts.DBConnectionString != "" {
-		err = render.GIS(w, opts.DBConnectionString, opts.Layers, opts.Terrain, opts.Seen)
+		err = render.GIS(w, opts.DBConnectionString, opts.Layers, opts.Terrain, opts.Seen, opts.SkipEmpty)
 		if err != nil {
 			log.Fatal(err)
 		}

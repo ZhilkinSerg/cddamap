@@ -30,17 +30,20 @@ func abs(x int) int {
 }
 
 type World struct {
-	Name          string
-	TerrainLayers []TerrainLayer
-	SeenLayers    map[string][]SeenLayer
+	Name              string
+	TerrainLayers     []TerrainLayer
+	SeenLayers        map[string][]SeenLayer
+	TerrainCellLookup map[uint32]TerrainCell
+	SeenCellLookup    map[bool]SeenCell
 }
 
 type TerrainLayer struct {
+	Empty       bool
 	TerrainRows []TerrainRow
 }
 
 type TerrainRow struct {
-	TerrainCells []TerrainCell
+	TerrainCellKeys []uint32
 }
 
 type TerrainCell struct {
@@ -52,14 +55,16 @@ type TerrainCell struct {
 }
 
 type SeenLayer struct {
+	Empty    bool
 	SeenRows []SeenRow
 }
 
 type SeenRow struct {
-	SeenCells []SeenCell
+	SeenCellKeys []bool
 }
 
 type SeenCell struct {
+	ID      string
 	Symbol  string
 	Seen    bool
 	ColorFG color.RGBA
@@ -67,13 +72,33 @@ type SeenCell struct {
 }
 
 func Build(m metadata.Overmap, s save.Save) (World, error) {
-	terrainLayers := buildTerrainLayers(m, s)
+
+	terrainCellLookup := make(map[uint32]TerrainCell)
+
+	seenCellLookup := map[bool]SeenCell{
+		true: SeenCell{
+			Symbol:  " ",
+			Seen:    true,
+			ColorFG: color.RGBA{0, 0, 0, 0},
+			ColorBG: color.RGBA{0, 0, 0, 0},
+		},
+		false: SeenCell{
+			Symbol:  "#",
+			Seen:    false,
+			ColorFG: color.RGBA{44, 44, 44, 255},
+			ColorBG: color.RGBA{0, 0, 0, 255},
+		},
+	}
+
+	terrainLayers := buildTerrainLayers(m, s, terrainCellLookup)
 	characterSeenLayers := buildCharacterSeenLayers(m, s)
 
 	world := World{
-		Name:          s.Name,
-		TerrainLayers: terrainLayers,
-		SeenLayers:    characterSeenLayers,
+		Name:              s.Name,
+		TerrainLayers:     terrainLayers,
+		SeenLayers:        characterSeenLayers,
+		TerrainCellLookup: terrainCellLookup,
+		SeenCellLookup:    seenCellLookup,
 	}
 
 	return world, nil
@@ -126,15 +151,12 @@ func calculateWorldChunkDimensions(m metadata.Overmap, s save.Save) worldChunkDi
 func buildCharacterSeenLayers(m metadata.Overmap, s save.Save) map[string][]SeenLayer {
 	wcd := calculateWorldChunkDimensions(m, s)
 	chunkCapacity := wcd.XSize * wcd.YSize
-	dfg := color.RGBA{44, 44, 44, 255}
-	dbg := color.RGBA{0, 0, 0, 255}
-	transparent := color.RGBA{0, 0, 0, 0}
 
 	seen := make(map[string][]SeenLayer)
 
 	for name, chunks := range s.Seen {
 		doneChunks := make(map[int]bool)
-		cells := make([]SeenCell, 680400*chunkCapacity)
+		cells := make([]bool, 680400*chunkCapacity)
 		for _, c := range chunks.Chunks {
 			ci := c.X + (0 - wcd.XMin) + wcd.XSize*(c.Y+0-wcd.YMin)
 			doneChunks[ci] = true
@@ -143,23 +165,7 @@ func buildCharacterSeenLayers(m metadata.Overmap, s save.Save) map[string][]Seen
 				for _, e := range l {
 					for i := 0; i < int(e.Count); i++ {
 						tmi := ci*680400 + li*32400 + lzp
-
-						if e.Seen {
-							cells[tmi] = SeenCell{
-								Symbol:  " ",
-								Seen:    true,
-								ColorFG: transparent,
-								ColorBG: transparent,
-							}
-						} else {
-							cells[tmi] = SeenCell{
-								Symbol:  "#",
-								Seen:    false,
-								ColorFG: dfg,
-								ColorBG: dbg,
-							}
-						}
-
+						cells[tmi] = e.Seen
 						lzp++
 					}
 				}
@@ -169,12 +175,7 @@ func buildCharacterSeenLayers(m metadata.Overmap, s save.Save) map[string][]Seen
 		for i := 0; i < chunkCapacity; i++ {
 			if _, ok := doneChunks[i]; !ok {
 				for e := 0; e < 680400; e++ {
-					cells[i*680400+e] = SeenCell{
-						Symbol:  "#",
-						Seen:    false,
-						ColorFG: dfg,
-						ColorBG: dbg,
-					}
+					cells[i*680400+e] = false
 				}
 			}
 		}
@@ -183,20 +184,26 @@ func buildCharacterSeenLayers(m metadata.Overmap, s save.Save) map[string][]Seen
 		for l := 0; l < 21; l++ {
 			layers[l].SeenRows = make([]SeenRow, 180*wcd.YSize)
 			for r := 0; r < 180*wcd.YSize; r++ {
-				layers[l].SeenRows[r].SeenCells = make([]SeenCell, 180*wcd.XSize)
+				layers[l].SeenRows[r].SeenCellKeys = make([]bool, 180*wcd.XSize)
 			}
 		}
 
 		for li := 0; li < 21; li++ {
+			empty := true
 			for xi := 0; xi < wcd.XSize; xi++ {
 				for yi := 0; yi < wcd.YSize; yi++ {
 					for ri := 0; ri < 180; ri++ {
 						for ci := 0; ci < 180; ci++ {
-							layers[li].SeenRows[yi*180+ri].SeenCells[xi*180+ci] = cells[(xi+yi*wcd.XSize)*680400+li*32400+ri*180+ci]
+							cell := cells[(xi+yi*wcd.XSize)*680400+li*32400+ri*180+ci]
+							layers[li].SeenRows[yi*180+ri].SeenCellKeys[xi*180+ci] = cells[(xi+yi*wcd.XSize)*680400+li*32400+ri*180+ci]
+							if empty && cell != false {
+								empty = false
+							}
 						}
 					}
 				}
 			}
+			layers[li].Empty = empty
 		}
 		seen[name] = layers
 	}
@@ -204,8 +211,9 @@ func buildCharacterSeenLayers(m metadata.Overmap, s save.Save) map[string][]Seen
 	return seen
 }
 
-func buildTerrainLayers(m metadata.Overmap, s save.Save) []TerrainLayer {
+func buildTerrainLayers(m metadata.Overmap, s save.Save, tcl map[uint32]TerrainCell) []TerrainLayer {
 	missingTerrain := make(map[string]int)
+
 	for _, c := range s.Overmap.Chunks {
 		for _, l := range c.Layers {
 			for _, e := range l {
@@ -227,26 +235,32 @@ func buildTerrainLayers(m metadata.Overmap, s save.Save) []TerrainLayer {
 	chunkCapacity := wcd.XSize * wcd.YSize
 
 	doneChunks := make(map[int]bool)
-	cells := make([]TerrainCell, 680400*chunkCapacity)
+	cells := make([]uint32, 680400*chunkCapacity)
 	for _, c := range s.Overmap.Chunks {
 		ci := c.X + (0 - wcd.XMin) + wcd.XSize*(c.Y+0-wcd.YMin)
 		doneChunks[ci] = true
 		for li, l := range c.Layers {
 			lzp := 0
 			for _, e := range l {
-				s := m.Symbol(e.OvermapTerrainID)
-				cfg, cbg := m.Color(e.OvermapTerrainID)
-				n := m.Name(e.OvermapTerrainID)
-
-				for i := 0; i < int(e.Count); i++ {
-					tmi := ci*680400 + li*32400 + lzp
-					cells[tmi] = TerrainCell{
+				h := save.HashTerrainID(e.OvermapTerrainID)
+				_, ok := tcl[h]
+				if !ok {
+					s := m.Symbol(e.OvermapTerrainID)
+					cfg, cbg := m.Color(e.OvermapTerrainID)
+					n := m.Name(e.OvermapTerrainID)
+					tc := TerrainCell{
 						ID:      e.OvermapTerrainID,
 						Symbol:  s,
 						ColorFG: cfg,
 						ColorBG: cbg,
 						Name:    n,
 					}
+					tcl[h] = tc
+				}
+
+				for i := 0; i < int(e.Count); i++ {
+					tmi := ci*680400 + li*32400 + lzp
+					cells[tmi] = h
 					lzp++
 				}
 			}
@@ -254,14 +268,19 @@ func buildTerrainLayers(m metadata.Overmap, s save.Save) []TerrainLayer {
 	}
 
 	dfg, dbg := m.Color("default")
+	tc := TerrainCell{
+		ID:      "",
+		Symbol:  " ",
+		ColorFG: dfg,
+		ColorBG: dbg,
+	}
+	h := save.HashTerrainID(tc.ID)
+	tcl[h] = tc
+
 	for i := 0; i < chunkCapacity; i++ {
 		if _, ok := doneChunks[i]; !ok {
 			for e := 0; e < 680400; e++ {
-				cells[i*680400+e] = TerrainCell{
-					Symbol:  " ",
-					ColorFG: dfg,
-					ColorBG: dbg,
-				}
+				cells[i*680400+e] = h
 			}
 		}
 	}
@@ -270,20 +289,30 @@ func buildTerrainLayers(m metadata.Overmap, s save.Save) []TerrainLayer {
 	for l := 0; l < 21; l++ {
 		layers[l].TerrainRows = make([]TerrainRow, 180*wcd.YSize)
 		for r := 0; r < 180*wcd.YSize; r++ {
-			layers[l].TerrainRows[r].TerrainCells = make([]TerrainCell, 180*wcd.XSize)
+			layers[l].TerrainRows[r].TerrainCellKeys = make([]uint32, 180*wcd.XSize)
 		}
 	}
 
+	emptyRockHash := save.HashTerrainID("empty_rock")
+	openAirHash := save.HashTerrainID("empty_rock")
+	blankHash := save.HashTerrainID("empty_rock")
+
 	for li := 0; li < 21; li++ {
+		empty := true
 		for xi := 0; xi < wcd.XSize; xi++ {
 			for yi := 0; yi < wcd.YSize; yi++ {
 				for ri := 0; ri < 180; ri++ {
 					for ci := 0; ci < 180; ci++ {
-						layers[li].TerrainRows[yi*180+ri].TerrainCells[xi*180+ci] = cells[(xi+yi*wcd.XSize)*680400+li*32400+ri*180+ci]
+						cell := cells[(xi+yi*wcd.XSize)*680400+li*32400+ri*180+ci]
+						layers[li].TerrainRows[yi*180+ri].TerrainCellKeys[xi*180+ci] = cell
+						if empty && cell != emptyRockHash && cell != openAirHash && cell != blankHash {
+							empty = false
+						}
 					}
 				}
 			}
 		}
+		layers[li].Empty = empty
 	}
 
 	return layers

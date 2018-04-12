@@ -17,6 +17,7 @@ import (
 )
 
 type overmapTerrain struct {
+	internalID uint32
 	ID         string   `json:"id"`
 	Type       string   `json:"type"`
 	Abstract   string   `json:"abstract"`
@@ -41,6 +42,16 @@ type spawns struct {
 type mapGen struct {
 	Method string `json:"method"`
 	Name   string `json:"name"`
+	Object object `json:"object"`
+}
+
+type object struct {
+	PlaceItems []placeItem `json:"place_items"`
+}
+
+type placeItem struct {
+	Item   string `json:"item"`
+	Chance int    `json:"chance"`
 }
 
 type modInfo struct {
@@ -222,6 +233,13 @@ type Overmap struct {
 	built map[string]overmapTerrain
 }
 
+func (o Overmap) UID(id string) uint32 {
+	if t, tok := o.built[id]; tok {
+		return t.internalID
+	}
+	return 0
+}
+
 func (o Overmap) Exists(id string) bool {
 	_, ok := o.built[id]
 	return ok
@@ -256,9 +274,9 @@ func (o Overmap) Name(id string) string {
 func Build(save save.Save, gameRoot string) (Overmap, error) {
 	o := Overmap{}
 
-	jsonRoot := filepath.Join(gameRoot, "data", "json")
-	modsRoot := filepath.Join(gameRoot, "data", "mods")
-	files, err := sourceFiles(jsonRoot, modsRoot, save.Mods)
+	jsonRoot := path.Join(gameRoot, "data", "json")
+	modsRoot := path.Join(gameRoot, "data", "mods")
+	files, err := overmapTerrainSourceFiles(jsonRoot, modsRoot, save.Mods)
 	if err != nil {
 		return o, err
 	}
@@ -280,10 +298,26 @@ func Build(save save.Save, gameRoot string) (Overmap, error) {
 		built: built,
 	}
 
+	/*
+		for k, v := range built {
+			if v.MapGen != nil {
+				fmt.Printf("%v:\n", k)
+				for _, mm := range v.MapGen {
+					if mm.Method == "json" {
+						for _, o := range mm.Object.PlaceItems {
+							fmt.Printf("\t%3d %v\n", o.Chance, o.Item)
+						}
+					}
+				}
+				fmt.Println()
+			}
+		}
+	*/
+
 	return o, nil
 }
 
-func sourceFiles(jsonRoot, modsRoot string, saveMods []string) ([]string, error) {
+func overmapTerrainSourceFiles(jsonRoot, modsRoot string, saveMods []string) ([]string, error) {
 	files := []string{}
 
 	err := filepath.Walk(jsonRoot, func(path string, info os.FileInfo, err error) error {
@@ -414,6 +448,7 @@ func buildTemplates(templates map[string]overmapTerrain) (map[string]overmapTerr
 		bt = append(bt, t)
 		for t.CopyFrom != "" {
 			t = templates[t.CopyFrom]
+			t.internalID = save.HashTerrainID(t.ID)
 			bt = append(bt, t)
 		}
 
@@ -427,6 +462,7 @@ func buildTemplates(templates map[string]overmapTerrain) (map[string]overmapTerr
 		if ot.Abstract == "" {
 			b.Abstract = ""
 			b.CopyFrom = ""
+			b.internalID = save.HashTerrainID(b.ID)
 			built[b.ID] = b
 
 			rotate := true
@@ -443,6 +479,7 @@ func buildTemplates(templates map[string]overmapTerrain) (map[string]overmapTerr
 							}
 							bs.ID = b.ID + suffix
 							bs.Sym = linearSuffixSymbols[suffix]
+							b.internalID = save.HashTerrainID(b.ID)
 							built[bs.ID] = bs
 						}
 					}
@@ -456,6 +493,7 @@ func buildTemplates(templates map[string]overmapTerrain) (map[string]overmapTerr
 						log.Fatal(err)
 					}
 					bs.ID = b.ID + suffix
+					b.internalID = save.HashTerrainID(b.ID)
 
 					for _, r := range rotations {
 						index := indexOf(r, b.Sym)

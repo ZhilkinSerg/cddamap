@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"hash/fnv"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -298,4 +299,10 @@ func characterSeenFileNameToCoordinates(chunkFile string) (int, int, error) {
 		return 0, 0, err
 	}
 	return x, y, nil
+}
+
+func HashTerrainID(s string) uint32 {
+	h := fnv.New32a()
+	h.Write([]byte(s))
+	return h.Sum32()
 }

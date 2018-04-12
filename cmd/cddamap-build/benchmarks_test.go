@@ -52,7 +52,7 @@ func BenchmarkRenderTerrainToImages(b *testing.B) {
 	b.ResetTimer()
 
 	for n := 0; n < b.N; n++ {
-		render.Image(w, "/Users/jj/Desktop/GoTest", l, true, false, false)
+		render.Image(w, "/Users/jj/Desktop/GoTest", l, true, false, false, true)
 	}
 }
 
@@ -64,7 +64,7 @@ func BenchmarkRenderSeenToImages(b *testing.B) {
 	b.ResetTimer()
 
 	for n := 0; n < b.N; n++ {
-		render.Image(w, "/Users/jj/Desktop/GoTest", l, false, true, false)
+		render.Image(w, "/Users/jj/Desktop/GoTest", l, false, true, false, true)
 	}
 }
 
@@ -76,7 +76,7 @@ func BenchmarkRenderSeenSolidToImages(b *testing.B) {
 	b.ResetTimer()
 
 	for n := 0; n < b.N; n++ {
-		render.Image(w, "/Users/jj/Desktop/GoTest", l, false, false, true)
+		render.Image(w, "/Users/jj/Desktop/GoTest", l, false, false, true, true)
 	}
 }
 
@@ -88,6 +88,6 @@ func BenchmarkRenderAllToImages(b *testing.B) {
 	b.ResetTimer()
 
 	for n := 0; n < b.N; n++ {
-		render.Image(w, "/Users/jj/Desktop/GoTest", l, true, true, true)
+		render.Image(w, "/Users/jj/Desktop/GoTest", l, true, true, true, true)
 	}
 }

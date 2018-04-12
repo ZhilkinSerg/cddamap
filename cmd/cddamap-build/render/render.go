@@ -13,6 +13,7 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
+	"github.com/ralreegorganon/cddamap/cmd/cddamap-build/save"
 	"github.com/ralreegorganon/cddamap/cmd/cddamap-build/world"
 	"golang.org/x/image/font"
 
@@ -43,8 +44,22 @@ func init() {
 	colorCache = make(map[color.RGBA]*image.Uniform)
 }
 
-func terrainToText(w world.World, outputRoot string, layerID int) error {
+func terrainToText(w world.World, outputRoot string, layerID int, skipEmpty bool) error {
 	l := w.TerrainLayers[layerID]
+
+	if l.Empty && skipEmpty {
+		return nil
+	}
+
+	var b strings.Builder
+	for _, r := range l.TerrainRows {
+		for _, k := range r.TerrainCellKeys {
+			c := w.TerrainCellLookup[k]
+			b.WriteString(c.Symbol)
+		}
+		b.WriteString("\n")
+	}
+
 	filename := filepath.Join(outputRoot, fmt.Sprintf("o_%v", layerID))
 	f, err := os.Create(filename)
 	if err != nil {
@@ -52,20 +67,28 @@ func terrainToText(w world.World, outputRoot string, layerID int) error {
 	}
 	defer f.Close()
 
-	var b strings.Builder
-	for _, r := range l.TerrainRows {
-		for _, c := range r.TerrainCells {
-			b.WriteString(c.Symbol)
-		}
-		b.WriteString("\n")
-	}
 	f.WriteString(b.String())
 	return nil
 }
 
-func seenToText(w world.World, outputRoot string, layerID int) error {
+func seenToText(w world.World, outputRoot string, layerID int, skipEmpty bool) error {
 	for name, layers := range w.SeenLayers {
 		l := layers[layerID]
+
+		if l.Empty && skipEmpty {
+			continue
+		}
+
+		var b strings.Builder
+		for _, r := range l.SeenRows {
+			for _, k := range r.SeenCellKeys {
+				cell := w.SeenCellLookup[k]
+				b.WriteString(cell.Symbol)
+
+			}
+			b.WriteString("\n")
+		}
+
 		filename := filepath.Join(outputRoot, fmt.Sprintf("%v_visible_%v", name, layerID))
 		f, err := os.Create(filename)
 		if err != nil {
@@ -73,23 +96,12 @@ func seenToText(w world.World, outputRoot string, layerID int) error {
 		}
 		defer f.Close()
 
-		var b strings.Builder
-		for _, r := range l.SeenRows {
-			for _, c := range r.SeenCells {
-				if c.Seen {
-					b.WriteString(" ")
-				} else {
-					b.WriteString("#")
-				}
-			}
-			b.WriteString("\n")
-		}
 		f.WriteString(b.String())
 	}
 	return nil
 }
 
-func Text(w world.World, outputRoot string, includeLayers []int, terrain, seen bool) error {
+func Text(w world.World, outputRoot string, includeLayers []int, terrain, seen, skipEmpty bool) error {
 	err := os.MkdirAll(outputRoot, os.ModePerm)
 	if err != nil {
 		return err
@@ -97,13 +109,13 @@ func Text(w world.World, outputRoot string, includeLayers []int, terrain, seen b
 
 	for _, layerID := range includeLayers {
 		if terrain {
-			err := terrainToText(w, outputRoot, layerID)
+			err := terrainToText(w, outputRoot, layerID, skipEmpty)
 			if err != nil {
 				return err
 			}
 		}
 		if seen {
-			err = seenToText(w, outputRoot, layerID)
+			err = seenToText(w, outputRoot, layerID, skipEmpty)
 			if err != nil {
 				return err
 			}
@@ -112,14 +124,19 @@ func Text(w world.World, outputRoot string, includeLayers []int, terrain, seen b
 	return nil
 }
 
-func terrainToImage(e *png.Encoder, rgba *image.RGBA, c *freetype.Context, w world.World, outputRoot string, layerID int) error {
+func terrainToImage(e *png.Encoder, rgba *image.RGBA, c *freetype.Context, w world.World, outputRoot string, layerID int, skipEmpty bool) error {
 	l := w.TerrainLayers[layerID]
+
+	if l.Empty && skipEmpty {
+		return nil
+	}
 
 	draw.Draw(rgba, rgba.Bounds(), image.Black, image.ZP, draw.Src)
 
 	pt := freetype.Pt(0, 0+int(c.PointToFixed(size)>>6))
 	for _, r := range l.TerrainRows {
-		for _, cell := range r.TerrainCells {
+		for _, k := range r.TerrainCellKeys {
+			cell := w.TerrainCellLookup[k]
 			bg, ok := colorCache[cell.ColorBG]
 			if !ok {
 				bg = image.NewUniform(cell.ColorBG)
@@ -162,15 +179,20 @@ func terrainToImage(e *png.Encoder, rgba *image.RGBA, c *freetype.Context, w wor
 	return nil
 }
 
-func seenToImage(e *png.Encoder, rgba *image.RGBA, c *freetype.Context, w world.World, outputRoot string, layerID int) error {
+func seenToImage(e *png.Encoder, rgba *image.RGBA, c *freetype.Context, w world.World, outputRoot string, layerID int, skipEmpty bool) error {
 	for name, layers := range w.SeenLayers {
 		l := layers[layerID]
+
+		if l.Empty && skipEmpty {
+			continue
+		}
 
 		draw.Draw(rgba, rgba.Bounds(), image.Black, image.ZP, draw.Src)
 
 		pt := freetype.Pt(0, 0+int(c.PointToFixed(size)>>6))
 		for _, r := range l.SeenRows {
-			for _, cell := range r.SeenCells {
+			for _, k := range r.SeenCellKeys {
+				cell := w.SeenCellLookup[k]
 				bg, ok := colorCache[cell.ColorBG]
 				if !ok {
 					bg = image.NewUniform(cell.ColorBG)
@@ -214,15 +236,20 @@ func seenToImage(e *png.Encoder, rgba *image.RGBA, c *freetype.Context, w world.
 	return nil
 }
 
-func seenToImageSolid(e *png.Encoder, rgba *image.RGBA, c *freetype.Context, w world.World, outputRoot string, layerID int) error {
+func seenToImageSolid(e *png.Encoder, rgba *image.RGBA, c *freetype.Context, w world.World, outputRoot string, layerID int, skipEmpty bool) error {
 	for name, layers := range w.SeenLayers {
 		l := layers[layerID]
+
+		if l.Empty && skipEmpty {
+			continue
+		}
 
 		draw.Draw(rgba, rgba.Bounds(), image.Black, image.ZP, draw.Src)
 
 		pt := freetype.Pt(0, 0+int(c.PointToFixed(size)>>6))
 		for _, r := range l.SeenRows {
-			for _, cell := range r.SeenCells {
+			for _, k := range r.SeenCellKeys {
+				cell := w.SeenCellLookup[k]
 				bg, ok := colorCache[cell.ColorBG]
 				if !ok {
 					bg = image.NewUniform(cell.ColorBG)
@@ -270,7 +297,7 @@ func (p *pool) Put(b *png.EncoderBuffer) {
 	p.b = b
 }
 
-func Image(w world.World, outputRoot string, includeLayers []int, terrain, seen, seenSolid bool) error {
+func Image(w world.World, outputRoot string, includeLayers []int, terrain, seen, seenSolid, skipEmpty bool) error {
 	err := os.MkdirAll(outputRoot, os.ModePerm)
 	if err != nil {
 		return err
@@ -286,7 +313,7 @@ func Image(w world.World, outputRoot string, includeLayers []int, terrain, seen,
 
 	l := w.TerrainLayers[includeLayers[0]]
 
-	width := int(cellWidth * float64(len(l.TerrainRows[0].TerrainCells)))
+	width := int(cellWidth * float64(len(l.TerrainRows[0].TerrainCellKeys)))
 	height := cellHeight * len(l.TerrainRows)
 	rgba := image.NewRGBA(image.Rect(0, 0, width, height))
 
@@ -300,22 +327,22 @@ func Image(w world.World, outputRoot string, includeLayers []int, terrain, seen,
 
 	for _, layerID := range includeLayers {
 		if terrain {
-			terrainToImage(e, rgba, c, w, outputRoot, layerID)
+			terrainToImage(e, rgba, c, w, outputRoot, layerID, skipEmpty)
 		}
 
 		if seen {
-			seenToImage(e, rgba, c, w, outputRoot, layerID)
+			seenToImage(e, rgba, c, w, outputRoot, layerID, skipEmpty)
 		}
 
 		if seenSolid {
-			seenToImageSolid(e, rgba, c, w, outputRoot, layerID)
+			seenToImageSolid(e, rgba, c, w, outputRoot, layerID, skipEmpty)
 		}
 	}
 
 	return nil
 }
 
-func GIS(w world.World, connectionString string, includeLayers []int, terrain, seen bool) error {
+func GIS(w world.World, connectionString string, includeLayers []int, terrain, seen, skipEmpty bool) error {
 	db, err := sqlx.Open("postgres", connectionString)
 	if err != nil {
 		return err
@@ -327,14 +354,24 @@ func GIS(w world.World, connectionString string, includeLayers []int, terrain, s
 		return err
 	}
 
-	for _, i := range includeLayers {
-		var layerID int
-		err = db.QueryRow("insert into layer (world_id, z) values ($1, $2) returning layer_id", worldID, i).Scan(&layerID)
-		if err != nil {
-			return err
-		}
+	emptyRockHash := save.HashTerrainID("empty_rock")
+	openAirHash := save.HashTerrainID("empty_rock")
+	blankHash := save.HashTerrainID("empty_rock")
 
+	for _, i := range includeLayers {
 		if terrain {
+			l := w.TerrainLayers[i]
+
+			if l.Empty && skipEmpty {
+				continue
+			}
+
+			var layerID int
+			err = db.QueryRow("insert into layer (world_id, z) values ($1, $2) returning layer_id", worldID, i).Scan(&layerID)
+			if err != nil {
+				return err
+			}
+
 			txn, err := db.Begin()
 			if err != nil {
 				return err
@@ -345,14 +382,18 @@ func GIS(w world.World, connectionString string, includeLayers []int, terrain, s
 				return err
 			}
 
-			l := w.TerrainLayers[i]
-
 			for ri, r := range l.TerrainRows {
-				for ci, c := range r.TerrainCells {
-					x := float64(ci) * 21.3594
-					y := float64(ri) * 24.0
-					x2 := x + 21.3594
-					y2 := y + 24.0
+				for ci, k := range r.TerrainCellKeys {
+					if k == emptyRockHash || k == openAirHash || k == blankHash {
+						continue
+					}
+
+					x := float64(ci) * cellWidth
+					y := float64(ri) * float64(cellHeight)
+					x2 := x + cellWidth
+					y2 := y + float64(cellHeight)
+
+					c := w.TerrainCellLookup[k]
 
 					geom := fmt.Sprintf("POLYGON((%[1]f %[2]f, %[3]f %[4]f, %[5]f %[6]f, %[7]f %[8]f, %[1]f %[2]f))", x, y, x2, y, x2, y2, x, y2)
 					_, err = stmt.Exec(layerID, c.ID, c.Name, geom)
