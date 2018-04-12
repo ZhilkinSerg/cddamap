@@ -112,7 +112,7 @@ func Text(w world.World, outputRoot string, includeLayers []int, terrain, seen b
 	return nil
 }
 
-func terrainToImage(w world.World, outputRoot string, layerID int) error {
+func terrainToImage(e *png.Encoder, w world.World, outputRoot string, layerID int) error {
 	l := w.TerrainLayers[layerID]
 
 	width := int(cellWidth * float64(len(l.TerrainRows[0].TerrainCells)))
@@ -159,7 +159,7 @@ func terrainToImage(w world.World, outputRoot string, layerID int) error {
 	defer outFile.Close()
 
 	b := bufio.NewWriter(outFile)
-	err = png.Encode(b, rgba)
+	err = e.Encode(b, rgba)
 	if err != nil {
 		return err
 	}
@@ -172,7 +172,7 @@ func terrainToImage(w world.World, outputRoot string, layerID int) error {
 	return nil
 }
 
-func seenToImage(w world.World, outputRoot string, layerID int) error {
+func seenToImage(e *png.Encoder, w world.World, outputRoot string, layerID int) error {
 	for name, layers := range w.SeenLayers {
 		l := layers[layerID]
 
@@ -220,7 +220,7 @@ func seenToImage(w world.World, outputRoot string, layerID int) error {
 		defer outFile.Close()
 
 		b := bufio.NewWriter(outFile)
-		err = png.Encode(b, rgba)
+		err = e.Encode(b, rgba)
 		if err != nil {
 			return err
 		}
@@ -234,7 +234,7 @@ func seenToImage(w world.World, outputRoot string, layerID int) error {
 	return nil
 }
 
-func seenToImageSolid(w world.World, outputRoot string, layerID int) error {
+func seenToImageSolid(e *png.Encoder, w world.World, outputRoot string, layerID int) error {
 	for name, layers := range w.SeenLayers {
 		l := layers[layerID]
 
@@ -274,7 +274,7 @@ func seenToImageSolid(w world.World, outputRoot string, layerID int) error {
 		defer outFile.Close()
 
 		b := bufio.NewWriter(outFile)
-		err = png.Encode(b, rgba)
+		err = e.Encode(b, rgba)
 		if err != nil {
 			return err
 		}
@@ -288,24 +288,39 @@ func seenToImageSolid(w world.World, outputRoot string, layerID int) error {
 	return nil
 }
 
+type pool struct {
+	b *png.EncoderBuffer
+}
+
+func (p *pool) Get() *png.EncoderBuffer {
+	return p.b
+}
+
+func (p *pool) Put(b *png.EncoderBuffer) {
+	p.b = b
+}
+
 func Image(w world.World, outputRoot string, includeLayers []int, terrain, seen, seenSolid bool) error {
 	err := os.MkdirAll(outputRoot, os.ModePerm)
 	if err != nil {
 		return err
 	}
 
+	e := &png.Encoder{
+		BufferPool: &pool{},
+	}
+
 	for _, layerID := range includeLayers {
 		if terrain {
-			terrainToImage(w, outputRoot, layerID)
-
+			terrainToImage(e, w, outputRoot, layerID)
 		}
 
 		if seen {
-			seenToImage(w, outputRoot, layerID)
+			seenToImage(e, w, outputRoot, layerID)
+		}
 
-			if seenSolid {
-				seenToImageSolid(w, outputRoot, layerID)
-			}
+		if seenSolid {
+			seenToImageSolid(e, w, outputRoot, layerID)
 		}
 	}
 
