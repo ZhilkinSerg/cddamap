@@ -112,20 +112,10 @@ func Text(w world.World, outputRoot string, includeLayers []int, terrain, seen b
 	return nil
 }
 
-func terrainToImage(e *png.Encoder, w world.World, outputRoot string, layerID int) error {
+func terrainToImage(e *png.Encoder, rgba *image.RGBA, c *freetype.Context, w world.World, outputRoot string, layerID int) error {
 	l := w.TerrainLayers[layerID]
 
-	width := int(cellWidth * float64(len(l.TerrainRows[0].TerrainCells)))
-	height := cellHeight * len(l.TerrainRows)
-	rgba := image.NewRGBA(image.Rect(0, 0, width, height))
 	draw.Draw(rgba, rgba.Bounds(), image.Black, image.ZP, draw.Src)
-	c := freetype.NewContext()
-	c.SetDPI(dpi)
-	c.SetFont(mapFont)
-	c.SetFontSize(size)
-	c.SetClip(rgba.Bounds())
-	c.SetDst(rgba)
-	c.SetHinting(font.HintingNone)
 
 	pt := freetype.Pt(0, 0+int(c.PointToFixed(size)>>6))
 	for _, r := range l.TerrainRows {
@@ -172,21 +162,11 @@ func terrainToImage(e *png.Encoder, w world.World, outputRoot string, layerID in
 	return nil
 }
 
-func seenToImage(e *png.Encoder, w world.World, outputRoot string, layerID int) error {
+func seenToImage(e *png.Encoder, rgba *image.RGBA, c *freetype.Context, w world.World, outputRoot string, layerID int) error {
 	for name, layers := range w.SeenLayers {
 		l := layers[layerID]
 
-		width := int(cellWidth * float64(len(l.SeenRows[0].SeenCells)))
-		height := cellHeight * len(l.SeenRows)
-		rgba := image.NewRGBA(image.Rect(0, 0, width, height))
 		draw.Draw(rgba, rgba.Bounds(), image.Black, image.ZP, draw.Src)
-		c := freetype.NewContext()
-		c.SetDPI(dpi)
-		c.SetFont(mapFont)
-		c.SetFontSize(size)
-		c.SetClip(rgba.Bounds())
-		c.SetDst(rgba)
-		c.SetHinting(font.HintingNone)
 
 		pt := freetype.Pt(0, 0+int(c.PointToFixed(size)>>6))
 		for _, r := range l.SeenRows {
@@ -234,21 +214,11 @@ func seenToImage(e *png.Encoder, w world.World, outputRoot string, layerID int) 
 	return nil
 }
 
-func seenToImageSolid(e *png.Encoder, w world.World, outputRoot string, layerID int) error {
+func seenToImageSolid(e *png.Encoder, rgba *image.RGBA, c *freetype.Context, w world.World, outputRoot string, layerID int) error {
 	for name, layers := range w.SeenLayers {
 		l := layers[layerID]
 
-		width := int(cellWidth * float64(len(l.SeenRows[0].SeenCells)))
-		height := cellHeight * len(l.SeenRows)
-		rgba := image.NewRGBA(image.Rect(0, 0, width, height))
 		draw.Draw(rgba, rgba.Bounds(), image.Black, image.ZP, draw.Src)
-		c := freetype.NewContext()
-		c.SetDPI(dpi)
-		c.SetFont(mapFont)
-		c.SetFontSize(size)
-		c.SetClip(rgba.Bounds())
-		c.SetDst(rgba)
-		c.SetHinting(font.HintingNone)
 
 		pt := freetype.Pt(0, 0+int(c.PointToFixed(size)>>6))
 		for _, r := range l.SeenRows {
@@ -310,17 +280,35 @@ func Image(w world.World, outputRoot string, includeLayers []int, terrain, seen,
 		BufferPool: &pool{},
 	}
 
+	if len(includeLayers) == 0 {
+		return nil
+	}
+
+	l := w.TerrainLayers[includeLayers[0]]
+
+	width := int(cellWidth * float64(len(l.TerrainRows[0].TerrainCells)))
+	height := cellHeight * len(l.TerrainRows)
+	rgba := image.NewRGBA(image.Rect(0, 0, width, height))
+
+	c := freetype.NewContext()
+	c.SetDPI(dpi)
+	c.SetFont(mapFont)
+	c.SetFontSize(size)
+	c.SetClip(rgba.Bounds())
+	c.SetDst(rgba)
+	c.SetHinting(font.HintingNone)
+
 	for _, layerID := range includeLayers {
 		if terrain {
-			terrainToImage(e, w, outputRoot, layerID)
+			terrainToImage(e, rgba, c, w, outputRoot, layerID)
 		}
 
 		if seen {
-			seenToImage(e, w, outputRoot, layerID)
+			seenToImage(e, rgba, c, w, outputRoot, layerID)
 		}
 
 		if seenSolid {
-			seenToImageSolid(e, w, outputRoot, layerID)
+			seenToImageSolid(e, rgba, c, w, outputRoot, layerID)
 		}
 	}
 
