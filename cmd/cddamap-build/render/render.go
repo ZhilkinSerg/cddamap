@@ -7,8 +7,10 @@ import (
 	"image/color"
 	"image/draw"
 	"image/png"
+	"math"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/jmoiron/sqlx"
@@ -174,6 +176,52 @@ func terrainToImage(e *png.Encoder, rgba *image.RGBA, c *freetype.Context, w wor
 	err = b.Flush()
 	if err != nil {
 		return err
+	}
+
+	chopIntoTiles(e, outputRoot, layerID, rgba)
+
+	return nil
+}
+
+func chopIntoTiles(e *png.Encoder, outputRoot string, layerID int, rgba *image.RGBA) error {
+	layerFolder := filepath.Join(outputRoot, fmt.Sprintf("o_%v_tiles", layerID))
+	err := os.MkdirAll(layerFolder, os.ModePerm)
+	if err != nil {
+		return err
+	}
+
+	b := rgba.Bounds()
+	tileXCount := int(math.Ceil(float64(b.Dx()) / 256.0))
+	tileYCount := int(math.Ceil(float64(b.Dy()) / 256.0))
+
+	for x := 0; x < tileXCount; x++ {
+		xFolder := filepath.Join(layerFolder, strconv.Itoa(x))
+		err := os.MkdirAll(xFolder, os.ModePerm)
+		if err != nil {
+			return err
+		}
+
+		for y := 0; y < tileYCount; y++ {
+			tile := rgba.SubImage(image.Rect(x*256, y*256, x*256+256, y*256+256))
+
+			filename := filepath.Join(xFolder, fmt.Sprintf("%v.png", y))
+			outFile, err := os.Create(filename)
+			if err != nil {
+				return err
+			}
+			defer outFile.Close()
+
+			b := bufio.NewWriter(outFile)
+			err = e.Encode(b, tile)
+			if err != nil {
+				return err
+			}
+
+			err = b.Flush()
+			if err != nil {
+				return err
+			}
+		}
 	}
 
 	return nil
