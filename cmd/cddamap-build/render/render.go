@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/disintegration/imaging"
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 	"github.com/ralreegorganon/cddamap/cmd/cddamap-build/save"
@@ -31,6 +32,7 @@ var cellHeight = 24
 var cellOverprintWidth = 22
 var mapFont *truetype.Font
 var colorCache map[color.RGBA]*image.Uniform
+var tileSize = 256
 
 func init() {
 	fontBytes, err := Asset("Topaz-8.ttf")
@@ -126,14 +128,14 @@ func Text(w world.World, outputRoot string, includeLayers []int, terrain, seen, 
 	return nil
 }
 
-func terrainToImage(e *png.Encoder, rgba *image.RGBA, c *freetype.Context, w world.World, outputRoot string, layerID int, skipEmpty bool) error {
+func terrainToImage(e *png.Encoder, RGBA *image.RGBA, c *freetype.Context, w world.World, outputRoot string, layerID int, skipEmpty, chop, resume bool, xCount, yCount int) error {
 	l := w.TerrainLayers[layerID]
 
 	if l.Empty && skipEmpty {
 		return nil
 	}
 
-	draw.Draw(rgba, rgba.Bounds(), image.Black, image.ZP, draw.Src)
+	draw.Draw(RGBA, RGBA.Bounds(), image.Black, image.ZP, draw.Src)
 
 	pt := freetype.Pt(0, 0+int(c.PointToFixed(size)>>6))
 	for _, r := range l.TerrainRows {
@@ -151,7 +153,7 @@ func terrainToImage(e *png.Encoder, rgba *image.RGBA, c *freetype.Context, w wor
 				colorCache[cell.ColorFG] = fg
 			}
 
-			draw.Draw(rgba, image.Rect(int(pt.X>>6), int(pt.Y>>6), int(pt.X>>6)+cellOverprintWidth, int(pt.Y>>6)-cellHeight), bg, image.ZP, draw.Src)
+			draw.Draw(RGBA, image.Rect(int(pt.X>>6), int(pt.Y>>6), int(pt.X>>6)+cellOverprintWidth, int(pt.Y>>6)-cellHeight), bg, image.ZP, draw.Src)
 			c.SetSrc(fg)
 			c.DrawString(cell.Symbol, pt)
 			pt.X += c.PointToFixed(cellWidth)
@@ -160,66 +162,99 @@ func terrainToImage(e *png.Encoder, rgba *image.RGBA, c *freetype.Context, w wor
 		pt.Y += c.PointToFixed(size * spacing)
 	}
 
-	filename := filepath.Join(outputRoot, fmt.Sprintf("o_%v.png", layerID))
-	outFile, err := os.Create(filename)
-	if err != nil {
-		return err
-	}
-	defer outFile.Close()
+	if chop {
+		layerTilesFolder := filepath.Join(outputRoot, fmt.Sprintf("o_%v_tiles", layerID))
+		err := chopIntoTiles(e, layerTilesFolder, RGBA, xCount, yCount, resume)
+		if err != nil {
+			return err
+		}
+	} else {
+		filename := filepath.Join(outputRoot, fmt.Sprintf("o_%v.png", layerID))
+		outFile, err := os.Create(filename)
+		if err != nil {
+			return err
+		}
+		defer outFile.Close()
 
-	b := bufio.NewWriter(outFile)
-	err = e.Encode(b, rgba)
-	if err != nil {
-		return err
-	}
+		b := bufio.NewWriter(outFile)
+		err = e.Encode(b, RGBA)
+		if err != nil {
+			return err
+		}
 
-	err = b.Flush()
-	if err != nil {
-		return err
+		err = b.Flush()
+		if err != nil {
+			return err
+		}
 	}
-
-	chopIntoTiles(e, outputRoot, layerID, rgba)
 
 	return nil
 }
 
-func chopIntoTiles(e *png.Encoder, outputRoot string, layerID int, rgba *image.RGBA) error {
-	layerFolder := filepath.Join(outputRoot, fmt.Sprintf("o_%v_tiles", layerID))
+func nativeZoom(xCount, yCount int) int {
+	return int(math.Max(math.Ceil(math.Log2(float64(xCount))), math.Ceil(math.Log2(float64(yCount)))))
+}
+
+func chopIntoTiles(e *png.Encoder, layerFolder string, RGBA *image.RGBA, xCount, yCount int, resume bool) error {
 	err := os.MkdirAll(layerFolder, os.ModePerm)
 	if err != nil {
 		return err
 	}
 
-	b := rgba.Bounds()
-	tileXCount := int(math.Ceil(float64(b.Dx()) / 256.0))
-	tileYCount := int(math.Ceil(float64(b.Dy()) / 256.0))
+	zCount := nativeZoom(xCount, yCount)
+	bounds := RGBA.Bounds()
+	width := bounds.Dx()
+	height := bounds.Dy()
 
-	for x := 0; x < tileXCount; x++ {
-		xFolder := filepath.Join(layerFolder, strconv.Itoa(x))
-		err := os.MkdirAll(xFolder, os.ModePerm)
-		if err != nil {
-			return err
-		}
+	for z := 0; z <= zCount; z++ {
+		zFolder := filepath.Join(layerFolder, strconv.Itoa(z))
+		cover := int(math.Pow(2, float64(zCount-z))) * tileSize
+		txc := int(math.Ceil(float64(width) / float64(cover)))
+		tyc := int(math.Ceil(float64(height) / float64(cover)))
+		tile := image.NewRGBA(image.Rect(0, 0, cover, cover))
+		tileBounds := tile.Bounds()
 
-		for y := 0; y < tileYCount; y++ {
-			tile := rgba.SubImage(image.Rect(x*256, y*256, x*256+256, y*256+256))
-
-			filename := filepath.Join(xFolder, fmt.Sprintf("%v.png", y))
-			outFile, err := os.Create(filename)
-			if err != nil {
-				return err
-			}
-			defer outFile.Close()
-
-			b := bufio.NewWriter(outFile)
-			err = e.Encode(b, tile)
+		for x := 0; x < txc; x++ {
+			xFolder := filepath.Join(zFolder, strconv.Itoa(x))
+			err := os.MkdirAll(xFolder, os.ModePerm)
 			if err != nil {
 				return err
 			}
 
-			err = b.Flush()
-			if err != nil {
-				return err
+			for y := 0; y < tyc; y++ {
+				filename := filepath.Join(xFolder, fmt.Sprintf("%v.png", y))
+
+				if _, err := os.Stat(filename); resume && !os.IsNotExist(err) {
+					continue
+				}
+
+				draw.Draw(tile, tileBounds, image.Transparent, image.ZP, draw.Src)
+				clipRect := image.Rect(x*cover, y*cover, x*cover+cover, y*cover+cover)
+				draw.Draw(tile, tileBounds, RGBA, clipRect.Min, draw.Src)
+
+				outFile, err := os.Create(filename)
+				if err != nil {
+					return err
+				}
+				defer outFile.Close()
+
+				b := bufio.NewWriter(outFile)
+				if tileSize == cover {
+					err = e.Encode(b, tile)
+					if err != nil {
+						return err
+					}
+				} else {
+					resizedTile := imaging.Resize(tile, tileSize, tileSize, imaging.Lanczos)
+					err = e.Encode(b, resizedTile)
+					if err != nil {
+						return err
+					}
+				}
+				err = b.Flush()
+				if err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -227,7 +262,7 @@ func chopIntoTiles(e *png.Encoder, outputRoot string, layerID int, rgba *image.R
 	return nil
 }
 
-func seenToImage(e *png.Encoder, rgba *image.RGBA, c *freetype.Context, w world.World, outputRoot string, layerID int, skipEmpty bool) error {
+func seenToImage(e *png.Encoder, RGBA *image.RGBA, c *freetype.Context, w world.World, outputRoot string, layerID int, skipEmpty, chop, resume bool, xCount, yCount int) error {
 	for name, layers := range w.SeenLayers {
 		l := layers[layerID]
 
@@ -235,7 +270,7 @@ func seenToImage(e *png.Encoder, rgba *image.RGBA, c *freetype.Context, w world.
 			continue
 		}
 
-		draw.Draw(rgba, rgba.Bounds(), image.Black, image.ZP, draw.Src)
+		draw.Draw(RGBA, RGBA.Bounds(), image.Black, image.ZP, draw.Src)
 
 		pt := freetype.Pt(0, 0+int(c.PointToFixed(size)>>6))
 		for _, r := range l.SeenRows {
@@ -253,7 +288,7 @@ func seenToImage(e *png.Encoder, rgba *image.RGBA, c *freetype.Context, w world.
 					colorCache[cell.ColorFG] = fg
 				}
 
-				draw.Draw(rgba, image.Rect(int(pt.X>>6), int(pt.Y>>6), int(pt.X>>6)+cellOverprintWidth, int(pt.Y>>6)-cellHeight), bg, image.ZP, draw.Src)
+				draw.Draw(RGBA, image.Rect(int(pt.X>>6), int(pt.Y>>6), int(pt.X>>6)+cellOverprintWidth, int(pt.Y>>6)-cellHeight), bg, image.ZP, draw.Src)
 				c.SetSrc(fg)
 				c.DrawString(cell.Symbol, pt)
 				pt.X += c.PointToFixed(cellWidth)
@@ -270,7 +305,7 @@ func seenToImage(e *png.Encoder, rgba *image.RGBA, c *freetype.Context, w world.
 		defer outFile.Close()
 
 		b := bufio.NewWriter(outFile)
-		err = e.Encode(b, rgba)
+		err = e.Encode(b, RGBA)
 		if err != nil {
 			return err
 		}
@@ -284,7 +319,7 @@ func seenToImage(e *png.Encoder, rgba *image.RGBA, c *freetype.Context, w world.
 	return nil
 }
 
-func seenToImageSolid(e *png.Encoder, rgba *image.RGBA, c *freetype.Context, w world.World, outputRoot string, layerID int, skipEmpty bool) error {
+func seenToImageSolid(e *png.Encoder, RGBA *image.RGBA, c *freetype.Context, w world.World, outputRoot string, layerID int, skipEmpty, chop, resume bool, xCount, yCount int) error {
 	for name, layers := range w.SeenLayers {
 		l := layers[layerID]
 
@@ -292,7 +327,7 @@ func seenToImageSolid(e *png.Encoder, rgba *image.RGBA, c *freetype.Context, w w
 			continue
 		}
 
-		draw.Draw(rgba, rgba.Bounds(), image.Black, image.ZP, draw.Src)
+		draw.Draw(RGBA, RGBA.Bounds(), image.Black, image.ZP, draw.Src)
 
 		pt := freetype.Pt(0, 0+int(c.PointToFixed(size)>>6))
 		for _, r := range l.SeenRows {
@@ -304,7 +339,7 @@ func seenToImageSolid(e *png.Encoder, rgba *image.RGBA, c *freetype.Context, w w
 					colorCache[cell.ColorBG] = bg
 				}
 
-				draw.Draw(rgba, image.Rect(int(pt.X>>6), int(pt.Y>>6), int(pt.X>>6)+cellOverprintWidth, int(pt.Y>>6)-cellHeight), bg, image.ZP, draw.Src)
+				draw.Draw(RGBA, image.Rect(int(pt.X>>6), int(pt.Y>>6), int(pt.X>>6)+cellOverprintWidth, int(pt.Y>>6)-cellHeight), bg, image.ZP, draw.Src)
 				pt.X += c.PointToFixed(cellWidth)
 			}
 			pt.X = c.PointToFixed(0)
@@ -319,7 +354,7 @@ func seenToImageSolid(e *png.Encoder, rgba *image.RGBA, c *freetype.Context, w w
 		defer outFile.Close()
 
 		b := bufio.NewWriter(outFile)
-		err = e.Encode(b, rgba)
+		err = e.Encode(b, RGBA)
 		if err != nil {
 			return err
 		}
@@ -345,7 +380,7 @@ func (p *pool) Put(b *png.EncoderBuffer) {
 	p.b = b
 }
 
-func Image(w world.World, outputRoot string, includeLayers []int, terrain, seen, seenSolid, skipEmpty bool) error {
+func Image(w world.World, outputRoot string, includeLayers []int, terrain, seen, seenSolid, skipEmpty, chop, resume bool) error {
 	err := os.MkdirAll(outputRoot, os.ModePerm)
 	if err != nil {
 		return err
@@ -363,27 +398,52 @@ func Image(w world.World, outputRoot string, includeLayers []int, terrain, seen,
 
 	width := int(cellWidth * float64(len(l.TerrainRows[0].TerrainCellKeys)))
 	height := cellHeight * len(l.TerrainRows)
-	rgba := image.NewRGBA(image.Rect(0, 0, width, height))
+
+	tileXCount := int(math.Ceil(float64(width) / float64(tileSize)))
+	tileYCount := int(math.Ceil(float64(height) / float64(tileSize)))
+	if chop {
+		xPaddingRequired := tileXCount*tileSize - width
+		yPaddingRequired := tileYCount*tileSize - height
+
+		if xPaddingRequired > 0 {
+			width += xPaddingRequired
+		}
+
+		if yPaddingRequired > 0 {
+			height += yPaddingRequired
+		}
+	}
+
+	RGBA := image.NewRGBA(image.Rect(0, 0, width, height))
 
 	c := freetype.NewContext()
 	c.SetDPI(dpi)
 	c.SetFont(mapFont)
 	c.SetFontSize(size)
-	c.SetClip(rgba.Bounds())
-	c.SetDst(rgba)
+	c.SetClip(RGBA.Bounds())
+	c.SetDst(RGBA)
 	c.SetHinting(font.HintingNone)
 
 	for _, layerID := range includeLayers {
 		if terrain {
-			terrainToImage(e, rgba, c, w, outputRoot, layerID, skipEmpty)
+			err := terrainToImage(e, RGBA, c, w, outputRoot, layerID, skipEmpty, chop, resume, tileXCount, tileYCount)
+			if err != nil {
+				return err
+			}
 		}
 
 		if seen {
-			seenToImage(e, rgba, c, w, outputRoot, layerID, skipEmpty)
+			err := seenToImage(e, RGBA, c, w, outputRoot, layerID, skipEmpty, chop, resume, tileXCount, tileYCount)
+			if err != nil {
+				return err
+			}
 		}
 
 		if seenSolid {
-			seenToImageSolid(e, rgba, c, w, outputRoot, layerID, skipEmpty)
+			err := seenToImageSolid(e, RGBA, c, w, outputRoot, layerID, skipEmpty, chop, resume, tileXCount, tileYCount)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
