@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"image/color"
 
-	"github.com/ralreegorganon/cddamap/cmd/cddamap-build/metadata"
-	"github.com/ralreegorganon/cddamap/cmd/cddamap-build/save"
+	"github.com/ralreegorganon/cddamap/internal/gen/metadata"
+	"github.com/ralreegorganon/cddamap/internal/gen/save"
 )
 
 func keyExists(decoded map[string]interface{}, key string) bool {

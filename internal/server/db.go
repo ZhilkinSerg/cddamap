@@ -1,4 +1,4 @@
-package cddamap
+package server
 
 import (
 	"fmt"

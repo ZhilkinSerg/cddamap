@@ -8,10 +8,10 @@ import (
 	"os/signal"
 	"time"
 
+	"github.com/ralreegorganon/cddamap/internal/server"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/mattes/migrate"
-	"github.com/ralreegorganon/cddamap"
 
 	_ "github.com/mattes/migrate/database/postgres"
 	_ "github.com/mattes/migrate/source/file"
@@ -38,7 +38,7 @@ func main() {
 	signal.Notify(interrupt, os.Interrupt)
 
 	connectionString := os.Getenv("CDDAMAP_CONNECTION_STRING")
-	var db cddamap.DB
+	var db server.DB
 	if err := db.Open(connectionString); err != nil {
 		log.Fatal(err)
 	}
@@ -58,8 +58,8 @@ func main() {
 		}
 	}
 
-	server := cddamap.NewHTTPServer(&db)
-	router, err := cddamap.CreateRouter(server)
+	s := server.NewHTTPServer(&db)
+	router, err := server.CreateRouter(s)
 	if err != nil {
 		log.Fatal(err)
 	}

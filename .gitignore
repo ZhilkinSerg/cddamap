@@ -1,5 +1,5 @@
 vendor
-build/bin
-build/migrations
-cmd/cddamap-build/cddamap-build
+cmd/cddamapgen/cddamapgen
 cmd/cddamap/cddamap
+images/cddamap/bin
+images/cddamap/migrations

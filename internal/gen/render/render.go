@@ -16,8 +16,8 @@ import (
 	"github.com/disintegration/imaging"
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
-	"github.com/ralreegorganon/cddamap/cmd/cddamap-build/save"
-	"github.com/ralreegorganon/cddamap/cmd/cddamap-build/world"
+	"github.com/ralreegorganon/cddamap/internal/gen/save"
+	"github.com/ralreegorganon/cddamap/internal/gen/world"
 	"golang.org/x/image/font"
 
 	"github.com/golang/freetype"

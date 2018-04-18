@@ -27,44 +27,45 @@ CDDAMAP_CONNECTION_STRING_LOCAL := postgres://$(DB_USER):$(DB_PASSWORD)@localhos
 CDDAMAP_CONNECTION_STRING_DOCKER := postgres://$(DB_USER):$(DB_PASSWORD)@db:5432/$(DB_USER)?sslmode=disable
 CDDAMAP_CONNECTION_STRING_MIGRATION_DOCKER := postgres://$(DB_USER):$(DB_PASSWORD)@localhost:$(DB_PORT_MIGRATION)/$(DB_USER)?sslmode=disable
 
-CDDAMAP_MIGRATIONS_PATH := file://migrations
+CDDAMAP_MIGRATIONS_PATH := file://internal/server/migrations
 
 dep:
 	dep ensure
 
 build:
-	go build -i -v -o build/bin/$(ARCH)/$(BINARY) $(GOBUILD_VERSION_ARGS) $(MAIN_PKG)
+	go build -i -v -o images/$(BINARY)/bin/$(ARCH)/$(BINARY) $(GOBUILD_VERSION_ARGS) $(MAIN_PKG)
 
 run: build
-	CDDAMAP_CONNECTION_STRING="$(CDDAMAP_CONNECTION_STRING_LOCAL)" CDDAMAP_MIGRATIONS_PATH="$(CDDAMAP_MIGRATIONS_PATH)"  ./build/bin/$(ARCH)/$(BINARY)
+	CDDAMAP_CONNECTION_STRING="$(CDDAMAP_CONNECTION_STRING_LOCAL)" CDDAMAP_MIGRATIONS_PATH="$(CDDAMAP_MIGRATIONS_PATH)"  ./images/$(BINARY)/bin/$(ARCH)/$(BINARY)
 
 install:
 	go install $(GOBUILD_VERSION_ARGS) $(MAIN_PKG)
 
 migrate:
-	cd migrations/ && CDDAMAP_CONNECTION_STRING="$(CDDAMAP_CONNECTION_STRING_LOCAL)" ./run-migrations
+	cd internal/server/migrations/ && CDDAMAP_CONNECTION_STRING="$(CDDAMAP_CONNECTION_STRING_LOCAL)" ./run-migrations
 
 docker:
-	mkdir -p build/migrations && cp migrations/*.sql build/migrations
-	GOOS=linux GOARCH=amd64 go build -o build/bin/linux/$(BINARY) $(GOBUILD_VERSION_ARGS) $(MAIN_PKG)
-	docker build --pull -t $(REGISTRY)/$(IMAGE_NAME):latest build
+	mkdir -p images/$(BINARY)/migrations && cp internal/server/migrations/*.sql images/$(BINARY)/migrations
+	GOOS=linux GOARCH=amd64 go build -o images/$(BINARY)/bin/linux/$(BINARY) $(GOBUILD_VERSION_ARGS) $(MAIN_PKG)
+	docker build --pull -t $(REGISTRY)/$(IMAGE_NAME):latest images/$(BINARY)
 
 run-docker: docker
-	cd build/ && DB_USER=$(DB_USER) DB_PASSWORD=$(DB_PASSWORD) DB_PORT_MIGRATION=$(DB_PORT_MIGRATION) CDDAMAP_CONNECTION_STRING="$(CDDAMAP_CONNECTION_STRING_DOCKER)" docker-compose -p cddamap rm -f cddamap
-	DB_USER=$(DB_USER) DB_PASSWORD=$(DB_PASSWORD) DB_PORT_MIGRATION=$(DB_PORT_MIGRATION) CDDAMAP_CONNECTION_STRING="$(CDDAMAP_CONNECTION_STRING_DOCKER)" docker-compose -f build/docker-compose.yml -p cddamap build
-	DB_USER=$(DB_USER) DB_PASSWORD=$(DB_PASSWORD) DB_PORT_MIGRATION=$(DB_PORT_MIGRATION) CDDAMAP_CONNECTION_STRING="$(CDDAMAP_CONNECTION_STRING_DOCKER)" docker-compose -f build/docker-compose.yml -p cddamap up -d
+	cd images/$(BINARY)/ && DB_USER=$(DB_USER) DB_PASSWORD=$(DB_PASSWORD) DB_PORT_MIGRATION=$(DB_PORT_MIGRATION) CDDAMAP_CONNECTION_STRING="$(CDDAMAP_CONNECTION_STRING_DOCKER)" docker-compose -p $(BINARY) rm -f $(BINARY)
+	DB_USER=$(DB_USER) DB_PASSWORD=$(DB_PASSWORD) DB_PORT_MIGRATION=$(DB_PORT_MIGRATION) CDDAMAP_CONNECTION_STRING="$(CDDAMAP_CONNECTION_STRING_DOCKER)" docker-compose -f images/$(BINARY)/docker-compose.yml -p $(BINARY) build
+	DB_USER=$(DB_USER) DB_PASSWORD=$(DB_PASSWORD) DB_PORT_MIGRATION=$(DB_PORT_MIGRATION) CDDAMAP_CONNECTION_STRING="$(CDDAMAP_CONNECTION_STRING_DOCKER)" docker-compose -f images/$(BINARY)/docker-compose.yml -p $(BINARY) up -d
 
 stop-docker:
-	cd build/ && DB_USER=$(DB_USER) DB_PASSWORD=$(DB_PASSWORD) DB_PORT_MIGRATION=$(DB_PORT_MIGRATION) CDDAMAP_CONNECTION_STRING="$(CDDAMAP_CONNECTION_STRING_DOCKER)" docker-compose -p cddamap stop
+	cd images/$(BINARY)/ && DB_USER=$(DB_USER) DB_PASSWORD=$(DB_PASSWORD) DB_PORT_MIGRATION=$(DB_PORT_MIGRATION) CDDAMAP_CONNECTION_STRING="$(CDDAMAP_CONNECTION_STRING_DOCKER)" docker-compose -p $(BINARY) stop
 
 migrate-docker:
-	cd migrations/ && CDDAMAP_CONNECTION_STRING="$(CDDAMAP_CONNECTION_STRING_MIGRATION_DOCKER)" ./run-migrations
+	cd internal/server/migrations/ && CDDAMAP_CONNECTION_STRING="$(CDDAMAP_CONNECTION_STRING_MIGRATION_DOCKER)" ./run-migrations
 
 docker-logs: 
-	cd build/ && DB_USER=$(DB_USER) DB_PASSWORD=$(DB_PASSWORD) DB_PORT_MIGRATION=$(DB_PORT_MIGRATION) CDDAMAP_CONNECTION_STRING="$(CDDAMAP_CONNECTION_STRING_DOCKER)" docker-compose -p cddamap logs
+	cd images/$(BINARY)/ && DB_USER=$(DB_USER) DB_PASSWORD=$(DB_PASSWORD) DB_PORT_MIGRATION=$(DB_PORT_MIGRATION) CDDAMAP_CONNECTION_STRING="$(CDDAMAP_CONNECTION_STRING_DOCKER)" docker-compose -p $(BINARY) logs
 
 clean:
-	rm -rf build/bin/*
+	rm -rf images/$(BINARY)/bin/*
+	rm -rf images/$(BINARY)/migrations/*
 
 release: docker
 	docker push $(REGISTRY)/$(IMAGE_NAME):latest

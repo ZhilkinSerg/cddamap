@@ -12,7 +12,7 @@ import (
 	"strings"
 
 	"github.com/imdario/mergo"
-	"github.com/ralreegorganon/cddamap/cmd/cddamap-build/save"
+	"github.com/ralreegorganon/cddamap/internal/gen/save"
 	log "github.com/sirupsen/logrus"
 )
 

@@ -7,10 +7,10 @@ import (
 	_ "net/http/pprof"
 
 	"github.com/jessevdk/go-flags"
-	"github.com/ralreegorganon/cddamap/cmd/cddamap-build/metadata"
-	"github.com/ralreegorganon/cddamap/cmd/cddamap-build/render"
-	"github.com/ralreegorganon/cddamap/cmd/cddamap-build/save"
-	"github.com/ralreegorganon/cddamap/cmd/cddamap-build/world"
+	"github.com/ralreegorganon/cddamap/internal/gen/metadata"
+	"github.com/ralreegorganon/cddamap/internal/gen/render"
+	"github.com/ralreegorganon/cddamap/internal/gen/save"
+	"github.com/ralreegorganon/cddamap/internal/gen/world"
 	log "github.com/sirupsen/logrus"
 )
 

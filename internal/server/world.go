@@ -1,4 +1,4 @@
-package cddamap
+package server
 
 type World struct {
 	ID   string `json:"id" db:"world_id"`
