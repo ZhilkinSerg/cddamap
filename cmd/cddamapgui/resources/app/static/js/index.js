@@ -35,11 +35,11 @@ let index = {
 			p = map.project(e.latlng, zl)
 
 			let message = {"name": "cell"};
-			message.payload = {L: 1, X: p.x, Y: p.y}
+			message.payload = {L: 10, X: p.x, Y: p.y}
 
-			asticode.loader.show();
+			//asticode.loader.show();
 			astilectron.sendMessage(message, function(message) {
-				asticode.loader.hide();
+				//asticode.loader.hide();
 				if (message.name === "error") {
 					asticode.notifier.error(message.payload);
 					return

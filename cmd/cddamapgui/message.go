@@ -2,13 +2,12 @@ package main
 
 import (
 	"encoding/json"
-	//"github.com/pkg/errors"
-	"github.com/ralreegorganon/cddamap/internal/server"
+	_ "github.com/mattn/go-sqlite3"
+
 	"github.com/asticode/go-astilectron"
 	"github.com/asticode/go-astilectron-bootstrap"
-	//"github.com/asticode/go-astilog"
-	_ "github.com/lib/pq"
-	
+	"github.com/jmoiron/sqlx"
+	"github.com/paulmach/go.geojson"
 )
 
 // handleMessages handles messages
@@ -37,20 +36,60 @@ type cellIndex struct {
 	Y float64
 }
 
-func blam(ci cellIndex) (interface{}, error) {
-	var db server.DB
-	
-	if err := db.Open("postgres://cddamap:cddamap@localhost:9432/cddamap?sslmode=disable"); err != nil {
-		return nil, err
-	}
+type cell struct {
+	X1   float64 `db:"x1"`
+	X2   float64 `db:"x2"`
+	Y1   float64 `db:"y1"`
+	Y2   float64 `db:"y2"`
+	Name string  `db:"name"`
+}
 
-	j, err := db.GetCellJson(ci.L, ci.X, ci.Y)
+func blam(ci cellIndex) (interface{}, error) {
+	db, err := sqlx.Open("sqlite3", "/Users/jj/Desktop/TrinityCenter/map.db")
 	if err != nil {
 		return nil, err
 	}
 
+	sql := `
+		select
+			x1, y1, x2, y2, name
+		from
+			cell
+		where
+			layer = $1 
+			and x1 <= $2 
+			and x2 >= $2
+			and y1 <= $3
+			and y2 >= $3
+		`
+
+	cells := []*cell{}
+	err = db.Select(&cells, sql, ci.L, ci.X, ci.Y)
+	if err != nil {
+		return nil, err
+	}
+
+	fc := geojson.NewFeatureCollection()
+
+	for _, c := range cells {
+		foo := [][][]float64{
+			[][]float64{
+				[]float64{c.X1, c.Y1},
+				[]float64{c.X2, c.Y1},
+				[]float64{c.X2, c.Y2},
+				[]float64{c.X1, c.Y2},
+				[]float64{c.X1, c.Y1},
+			},
+		}
+		f := geojson.NewPolygonFeature(foo)
+		f.Properties["name"] = c.Name
+		fc.AddFeature(f)
+	}
+
+	rawJSON, err := fc.MarshalJSON()
+
 	var m map[string]interface{}
-	if err = json.Unmarshal(j, &m); err != nil {
+	if err = json.Unmarshal(rawJSON, &m); err != nil {
 		return nil, err
 	}
 
