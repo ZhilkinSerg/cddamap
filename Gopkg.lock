@@ -2,6 +2,12 @@
 
 
 [[projects]]
+  name = "github.com/disintegration/imaging"
+  packages = ["."]
+  revision = "fd34ef7671b12cdf1b024d98c6b327b2770d32c4"
+  version = "v1.4.1"
+
+[[projects]]
   branch = "master"
   name = "github.com/golang/freetype"
   packages = [".","raster","truetype"]
@@ -64,7 +70,7 @@
 [[projects]]
   branch = "master"
   name = "golang.org/x/image"
-  packages = ["font","math/fixed"]
+  packages = ["bmp","font","math/fixed","tiff","tiff/lzw"]
   revision = "f315e440302883054d0c2bd85486878cb4f8572c"
 
 [[projects]]
@@ -76,6 +82,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "807fbc87d7b97fd83c339b35d364947db19ee3203a0cb672d90b3957b3b9fbe0"
+  inputs-digest = "9868038fc8891f0370cf79515ad697861510f0801f72296cf4bc6527b750776e"
   solver-name = "gps-cdcl"
   solver-version = 1

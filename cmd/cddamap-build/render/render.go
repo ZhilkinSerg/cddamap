@@ -236,18 +236,19 @@ func chopIntoTiles(e *png.Encoder, layerFolder string, RGBA *image.RGBA, xCount,
 				if err != nil {
 					return err
 				}
-				defer outFile.Close()
 
 				b := bufio.NewWriter(outFile)
 				if tileSize == cover {
 					err = e.Encode(b, tile)
 					if err != nil {
+						outFile.Close()
 						return err
 					}
 				} else {
 					resizedTile := imaging.Resize(tile, tileSize, tileSize, imaging.Lanczos)
 					err = e.Encode(b, resizedTile)
 					if err != nil {
+						outFile.Close()
 						return err
 					}
 				}
@@ -255,6 +256,7 @@ func chopIntoTiles(e *png.Encoder, layerFolder string, RGBA *image.RGBA, xCount,
 				if err != nil {
 					return err
 				}
+				outFile.Close()
 			}
 		}
 	}
