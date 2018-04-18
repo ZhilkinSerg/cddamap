@@ -11,17 +11,12 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 
 	"github.com/disintegration/imaging"
-	"github.com/jmoiron/sqlx"
-	"github.com/lib/pq"
-	"github.com/ralreegorganon/cddamap/internal/gen/save"
-	"github.com/ralreegorganon/cddamap/internal/gen/world"
-	"golang.org/x/image/font"
-
 	"github.com/golang/freetype"
 	"github.com/golang/freetype/truetype"
+	"github.com/ralreegorganon/cddamap/internal/gen/world"
+	"golang.org/x/image/font"
 )
 
 var dpi = 72.0
@@ -46,86 +41,6 @@ func init() {
 	}
 
 	colorCache = make(map[color.RGBA]*image.Uniform)
-}
-
-func terrainToText(w world.World, outputRoot string, layerID int, skipEmpty bool) error {
-	l := w.TerrainLayers[layerID]
-
-	if l.Empty && skipEmpty {
-		return nil
-	}
-
-	var b strings.Builder
-	for _, r := range l.TerrainRows {
-		for _, k := range r.TerrainCellKeys {
-			c := w.TerrainCellLookup[k]
-			b.WriteString(c.Symbol)
-		}
-		b.WriteString("\n")
-	}
-
-	filename := filepath.Join(outputRoot, fmt.Sprintf("o_%v", layerID))
-	f, err := os.Create(filename)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	f.WriteString(b.String())
-	return nil
-}
-
-func seenToText(w world.World, outputRoot string, layerID int, skipEmpty bool) error {
-	for name, layers := range w.SeenLayers {
-		l := layers[layerID]
-
-		if l.Empty && skipEmpty {
-			continue
-		}
-
-		var b strings.Builder
-		for _, r := range l.SeenRows {
-			for _, k := range r.SeenCellKeys {
-				cell := w.SeenCellLookup[k]
-				b.WriteString(cell.Symbol)
-
-			}
-			b.WriteString("\n")
-		}
-
-		filename := filepath.Join(outputRoot, fmt.Sprintf("%v_visible_%v", name, layerID))
-		f, err := os.Create(filename)
-		if err != nil {
-			return err
-		}
-		defer f.Close()
-
-		f.WriteString(b.String())
-	}
-	return nil
-}
-
-func Text(w world.World, outputRoot string, includeLayers []int, terrain, seen, skipEmpty bool) error {
-	err := os.MkdirAll(outputRoot, os.ModePerm)
-	if err != nil {
-		return err
-	}
-
-	for _, layerID := range includeLayers {
-		if terrain {
-			err := terrainToText(w, outputRoot, layerID, skipEmpty)
-			if err != nil {
-				return err
-			}
-		}
-		if seen {
-			err = seenToText(w, outputRoot, layerID, skipEmpty)
-			if err != nil {
-				return err
-			}
-		}
-	}
-	return nil
 }
 
 func terrainToImage(e *png.Encoder, RGBA *image.RGBA, c *freetype.Context, w world.World, outputRoot string, layerID int, skipEmpty, chop, resume bool, xCount, yCount int) error {
@@ -449,84 +364,5 @@ func Image(w world.World, outputRoot string, includeLayers []int, terrain, seen,
 		}
 	}
 
-	return nil
-}
-
-func GIS(w world.World, connectionString string, includeLayers []int, terrain, seen, skipEmpty bool) error {
-	db, err := sqlx.Open("postgres", connectionString)
-	if err != nil {
-		return err
-	}
-
-	var worldID int
-	err = db.QueryRow("insert into world (name) values ($1) returning world_id", w.Name).Scan(&worldID)
-	if err != nil {
-		return err
-	}
-
-	emptyRockHash := save.HashTerrainID("empty_rock")
-	openAirHash := save.HashTerrainID("empty_rock")
-	blankHash := save.HashTerrainID("empty_rock")
-
-	for _, i := range includeLayers {
-		if terrain {
-			l := w.TerrainLayers[i]
-
-			if l.Empty && skipEmpty {
-				continue
-			}
-
-			var layerID int
-			err = db.QueryRow("insert into layer (world_id, z) values ($1, $2) returning layer_id", worldID, i).Scan(&layerID)
-			if err != nil {
-				return err
-			}
-
-			txn, err := db.Begin()
-			if err != nil {
-				return err
-			}
-
-			stmt, err := txn.Prepare(pq.CopyIn("cell", "layer_id", "id", "name", "the_geom"))
-			if err != nil {
-				return err
-			}
-
-			for ri, r := range l.TerrainRows {
-				for ci, k := range r.TerrainCellKeys {
-					if k == emptyRockHash || k == openAirHash || k == blankHash {
-						continue
-					}
-
-					x := float64(ci) * cellWidth
-					y := float64(ri) * float64(cellHeight)
-					x2 := x + cellWidth
-					y2 := y + float64(cellHeight)
-
-					c := w.TerrainCellLookup[k]
-
-					geom := fmt.Sprintf("POLYGON((%[1]f %[2]f, %[3]f %[4]f, %[5]f %[6]f, %[7]f %[8]f, %[1]f %[2]f))", x, y, x2, y, x2, y2, x, y2)
-					_, err = stmt.Exec(layerID, c.ID, c.Name, geom)
-					if err != nil {
-						return err
-					}
-				}
-			}
-			_, err = stmt.Exec()
-			if err != nil {
-				return err
-			}
-
-			err = stmt.Close()
-			if err != nil {
-				return err
-			}
-
-			err = txn.Commit()
-			if err != nil {
-				return err
-			}
-		}
-	}
 	return nil
 }

@@ -28,6 +28,7 @@ var opts struct {
 	SkipEmpty          bool   `short:"k" long:"skipempty" description:"Skip rendering empty layers"`
 	Chop               bool   `short:"p" long:"chop" description:"Chop images into tiles instead of rendering as a single image"`
 	Resume             bool   `short:"z" long:"resume" description:"Resume tile building, instead of overwriting"`
+	Sqlite             bool   `short:"q" long:"sqlite" description:"Write metadata to SQLite"`
 }
 
 func init() {
@@ -86,6 +87,13 @@ func main() {
 
 	if opts.DBConnectionString != "" {
 		err = render.GIS(w, opts.DBConnectionString, opts.Layers, opts.Terrain, opts.Seen, opts.SkipEmpty)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	if opts.Sqlite {
+		err = render.Sqlite(w, opts.OutputDir, opts.Layers, opts.Terrain, opts.Seen, opts.SkipEmpty)
 		if err != nil {
 			log.Fatal(err)
 		}
