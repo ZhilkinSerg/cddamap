@@ -1,5 +1,9 @@
 vendor
 cmd/cddamapgen/cddamapgen
 cmd/cddamap/cddamap
+cmd/cddamapgui/output
+cmd/cddamapgui/vendor*
+cmd/cddamapgui/bind*
 images/cddamap/bin
 images/cddamap/migrations
+
