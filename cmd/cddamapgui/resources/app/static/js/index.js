@@ -13,7 +13,6 @@ let index = {
 
 		var map = L.map('map', {
 			crs: L.CRS.Simple,
-			//maxZoom: 8
 		}).setView([-128, 128], 1);
 
 		var tiles = L.tileLayer('http://localhost:8080/{z}/{x}/{y}.png', {
@@ -34,24 +33,20 @@ let index = {
 
 		map.on('click', function (e) {
 			p = map.project(e.latlng, zl)
-			response = index.cell(1, p.x, p.y)
-			console.log(response)
-			selectedCell.clearLayers()
-			selectedCell.addData(response)
-		});
-	},
-	cell: function(l, x, y) {
-        let message = {"name": "cell"};
-		message.payload = {L: l, X: x, Y: y}
 
-        asticode.loader.show();
-        astilectron.sendMessage(message, function(message) {
-            asticode.loader.hide();
-            if (message.name === "error") {
-                asticode.notifier.error(message.payload);
-                return
-			}
-			return message.payload
-        })
-    },
+			let message = {"name": "cell"};
+			message.payload = {L: 1, X: p.x, Y: p.y}
+
+			asticode.loader.show();
+			astilectron.sendMessage(message, function(message) {
+				asticode.loader.hide();
+				if (message.name === "error") {
+					asticode.notifier.error(message.payload);
+					return
+				}
+				selectedCell.clearLayers()
+				selectedCell.addData(message.payload)
+			})
+		});
+	}
 };
