@@ -67,6 +67,7 @@ func (db *DB) GetWorldInfo(worldID int) (WorldInfo, error) {
 		return worldInfo, err
 	}
 
+	worldInfo.ID = worldLayerInfos[0].WorldID
 	worldInfo.Name = worldLayerInfos[0].WorldName
 	worldInfo.MaxZ = worldLayerInfos[0].MaxZ
 

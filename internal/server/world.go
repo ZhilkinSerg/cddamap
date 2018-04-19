@@ -26,6 +26,7 @@ type ZLevel struct {
 }
 
 type WorldInfo struct {
+	ID   int             `json:"id"`
 	Name string          `json:"name"`
 	MaxZ int             `json:"maxz"`
 	Z    map[int]*ZLevel `json:"z"`
