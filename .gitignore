@@ -3,3 +3,4 @@ cmd/cddamapgen/cddamapgen
 cmd/cddamap/cddamap
 images/cddamap/bin
 images/cddamap/migrations
+tiles

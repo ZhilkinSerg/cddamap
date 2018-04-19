@@ -1,6 +1,7 @@
 package render
 
 import (
+	"database/sql"
 	"fmt"
 
 	"github.com/jmoiron/sqlx"
@@ -16,14 +17,19 @@ func GIS(w world.World, connectionString string, includeLayers []int, terrain, s
 	}
 
 	var worldID int
-	err = db.QueryRow("insert into world (name) values ($1) returning world_id", w.Name).Scan(&worldID)
-	if err != nil {
+	err = db.QueryRow("select world_id from world where name = $1", w.Name).Scan(&worldID)
+	if err == sql.ErrNoRows {
+		err = db.QueryRow("insert into world (name) values ($1) returning world_id", w.Name).Scan(&worldID)
+		if err != nil {
+			return err
+		}
+	} else if err != nil {
 		return err
 	}
 
 	emptyRockHash := save.HashTerrainID("empty_rock")
-	openAirHash := save.HashTerrainID("empty_rock")
-	blankHash := save.HashTerrainID("empty_rock")
+	openAirHash := save.HashTerrainID("open_air")
+	blankHash := save.HashTerrainID("")
 
 	for _, i := range includeLayers {
 		if terrain {
@@ -34,12 +40,27 @@ func GIS(w world.World, connectionString string, includeLayers []int, terrain, s
 			}
 
 			var layerID int
-			err = db.QueryRow("insert into layer (world_id, z) values ($1, $2) returning layer_id", worldID, i).Scan(&layerID)
-			if err != nil {
+			err = db.QueryRow("select layer_id from layer where world_id = $1 and z = $2", worldID, i).Scan(&layerID)
+			if err == sql.ErrNoRows {
+				err = db.QueryRow("insert into layer (world_id, z) values ($1, $2) returning layer_id", worldID, i).Scan(&layerID)
+				if err != nil {
+					return err
+				}
+			} else if err != nil {
 				return err
 			}
 
 			txn, err := db.Begin()
+			if err != nil {
+				return err
+			}
+
+			nukeCellsStmt, err := txn.Prepare("delete from cell where layer_id = $1")
+			if err != nil {
+				return err
+			}
+
+			_, err = nukeCellsStmt.Exec(layerID)
 			if err != nil {
 				return err
 			}

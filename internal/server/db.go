@@ -53,7 +53,7 @@ func (db *DB) GetCellJson(layerID int, x, y float64) ([]byte, error) {
 							'name', name
 						) as properties
 					from
-						cell
+						v_cell
 					where 
 						layer_id = $1
 						and ST_CoveredBy(ST_GeomFromText('POINT(%[1]f %[2]f)'), the_geom)
@@ -67,4 +67,13 @@ func (db *DB) GetCellJson(layerID int, x, y float64) ([]byte, error) {
 		return nil, err
 	}
 	return json, nil
+}
+
+func (db *DB) GetTileRoot(layerID int) (string, error) {
+	var tileRoot string
+	err := db.QueryRow("select tile_root from v_tile where layer_id = $1", layerID).Scan(&tileRoot)
+	if err != nil {
+		return "", err
+	}
+	return tileRoot, nil
 }

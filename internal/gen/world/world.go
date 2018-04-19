@@ -294,8 +294,8 @@ func buildTerrainLayers(m metadata.Overmap, s save.Save, tcl map[uint32]TerrainC
 	}
 
 	emptyRockHash := save.HashTerrainID("empty_rock")
-	openAirHash := save.HashTerrainID("empty_rock")
-	blankHash := save.HashTerrainID("empty_rock")
+	openAirHash := save.HashTerrainID("open_air")
+	blankHash := save.HashTerrainID("")
 
 	for li := 0; li < 21; li++ {
 		empty := true

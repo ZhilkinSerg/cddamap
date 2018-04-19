@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"time"
 
 	"github.com/ralreegorganon/cddamap/internal/server"
@@ -18,6 +19,7 @@ import (
 )
 
 var version = flag.Bool("version", false, "Print version")
+var tileRoot = flag.String("tileRoot", "./tiles", "Root directory for tiles")
 
 func init() {
 	f := &log.TextFormatter{
@@ -58,7 +60,12 @@ func main() {
 		}
 	}
 
-	s := server.NewHTTPServer(&db)
+	absTileRoot, err := filepath.Abs(*tileRoot)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	s := server.NewHTTPServer(&db, absTileRoot)
 	router, err := server.CreateRouter(s)
 	if err != nil {
 		log.Fatal(err)
@@ -68,6 +75,7 @@ func main() {
 	u := "0.0.0.0:8989"
 	go http.ListenAndServe(u, nil)
 	log.WithField("address", u).Info("cddamap web server started")
+	log.WithField("tileRoot", absTileRoot).Info("serving tiles")
 
 	<-interrupt
 }

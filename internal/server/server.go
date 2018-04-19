@@ -2,7 +2,10 @@ package server
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 
 	"github.com/gorilla/mux"
@@ -14,7 +17,8 @@ func CreateRouter(server *HTTPServer) (*mux.Router, error) {
 	m := map[string]map[string]HttpApiFunc{
 		"GET": {
 			"/api/worlds": server.GetWorlds,
-			"/api/worlds/{worldID:[0-9]+}/layers/{layerID:[0-9]+}/cells/{x}/{y}": server.GetCells,
+			"/api/worlds/{worldID:[0-9]+}/layers/{layerID:[0-9]+}/cells/{x}/{y}":                          server.GetCells,
+			"/api/worlds/{worldID:[0-9]+}/layers/{layerID:[0-9]+}/tiles/{z:[0-9]+}/{x:[0-9]+}/{y:[0-9]+}": server.GetTile,
 		},
 		"POST": {},
 		"PUT":  {},
@@ -59,12 +63,14 @@ func writeCorsHeaders(w http.ResponseWriter, r *http.Request) {
 type HttpApiFunc func(w http.ResponseWriter, r *http.Request, vars map[string]string) error
 
 type HTTPServer struct {
-	DB *DB
+	DB       *DB
+	tileRoot string
 }
 
-func NewHTTPServer(db *DB) *HTTPServer {
+func NewHTTPServer(db *DB, tileRoot string) *HTTPServer {
 	s := &HTTPServer{
-		DB: db,
+		DB:       db,
+		tileRoot: tileRoot,
 	}
 
 	return s
@@ -131,5 +137,57 @@ func (s *HTTPServer) GetCells(w http.ResponseWriter, r *http.Request, vars map[s
 		return err
 	}
 	writeJSONDirect(w, http.StatusOK, json)
+	return nil
+}
+
+func (s *HTTPServer) GetTile(w http.ResponseWriter, r *http.Request, vars map[string]string) error {
+	layerID, err := strconv.Atoi(vars["layerID"])
+	if err != nil {
+		return err
+	}
+
+	x, err := strconv.Atoi(vars["x"])
+	if err != nil {
+		return err
+	}
+
+	y, err := strconv.Atoi(vars["y"])
+	if err != nil {
+		return err
+	}
+
+	z, err := strconv.Atoi(vars["z"])
+	if err != nil {
+		return err
+	}
+
+	t, err := s.DB.GetTileRoot(layerID)
+	if err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		return nil
+	}
+
+	tile := filepath.Join(s.tileRoot, t, strconv.Itoa(z), strconv.Itoa(x), strconv.Itoa(y)+".png")
+
+	f, err := os.Open(tile)
+	defer f.Close()
+	if err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		return nil
+	}
+
+	h := make([]byte, 512)
+	f.Read(h)
+	ct := http.DetectContentType(h)
+
+	stat, _ := f.Stat()
+	fs := strconv.FormatInt(stat.Size(), 10)
+
+	w.Header().Set("Content-Type", ct)
+	w.Header().Set("Content-Length", fs)
+
+	f.Seek(0, 0)
+	io.Copy(w, f)
+
 	return nil
 }
