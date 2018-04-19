@@ -30,6 +30,12 @@
   version = "v1.6.1"
 
 [[projects]]
+  name = "github.com/guregu/null"
+  packages = ["."]
+  revision = "e81d6d8d57747b34d7c5fe0d20ebf57692f04ea9"
+  version = "v3.3.0"
+
+[[projects]]
   name = "github.com/imdario/mergo"
   packages = ["."]
   revision = "9d5f1277e9a8ed20c3684bda8fde67c05628518c"
@@ -107,6 +113,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "9868038fc8891f0370cf79515ad697861510f0801f72296cf4bc6527b750776e"
+  inputs-digest = "6b314b137f77c0cf86f9c733fc22502814b2464b5f355fa9cb3bac665cdb4a79"
   solver-name = "gps-cdcl"
   solver-version = 1

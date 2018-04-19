@@ -3,6 +3,7 @@ package server
 import (
 	"fmt"
 
+	"github.com/guregu/null"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -19,8 +20,8 @@ func (db *DB) Open(connectionString string) error {
 	return nil
 }
 
-func (db *DB) GetWorlds() ([]*World, error) {
-	worlds := []*World{}
+func (db *DB) GetWorlds() ([]World, error) {
+	worlds := []World{}
 	err := db.Select(&worlds, `
 		select 
 			world_id, 
@@ -32,6 +33,67 @@ func (db *DB) GetWorlds() ([]*World, error) {
 		return nil, err
 	}
 	return worlds, nil
+}
+
+func (db *DB) GetWorldInfo(worldID int) (WorldInfo, error) {
+	worldInfo := WorldInfo{
+		Z: make(map[int]*ZLevel),
+	}
+
+	worldLayerInfos := []WorldLayerInfo{}
+	err := db.Select(&worldLayerInfos, `
+		select
+			w.world_id,
+			w.maxz,
+			l.layer_id,
+			l.z,
+			l.type,
+			c.name character_name,
+			w.name world_name
+		from 
+			world w
+			left outer join layer l 
+				on w.world_id = l.world_id
+			left outer join character c
+				on l.character_id = c.character_id
+		where
+			w.world_id = $1
+	`, worldID)
+	if err != nil {
+		return worldInfo, err
+	}
+
+	if len(worldLayerInfos) == 0 {
+		return worldInfo, err
+	}
+
+	worldInfo.Name = worldLayerInfos[0].WorldName
+	worldInfo.MaxZ = worldLayerInfos[0].MaxZ
+
+	for _, wli := range worldLayerInfos {
+		z, ok := worldInfo.Z[wli.Z]
+		if !ok {
+			z = &ZLevel{
+				SeenLayer:      make(map[string]int),
+				SeenSolidLayer: make(map[string]int),
+			}
+			worldInfo.Z[wli.Z] = z
+		}
+
+		switch wli.Type {
+		case "overmap":
+			z.TerrainLayer = null.IntFrom(int64(wli.LayerID))
+			break
+		case "seen":
+			z.SeenLayer[wli.CharacterName.String] = wli.LayerID
+			break
+		case "seen_solid":
+			z.SeenSolidLayer[wli.CharacterName.String] = wli.LayerID
+			break
+		}
+	}
+
+	return worldInfo, nil
 }
 
 func (db *DB) GetCellJson(layerID int, x, y float64) ([]byte, error) {
