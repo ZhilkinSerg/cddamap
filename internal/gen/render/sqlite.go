@@ -69,5 +69,9 @@ func Sqlite(w world.World, outputRoot string, includeLayers []int, terrain, seen
 			}
 		}
 	}
+
+	indexStmt, _ := db.Prepare("create index idx_cell_all on cell(layer, x1, x2, y1, y2, name)")
+	indexStmt.Exec()
+
 	return nil
 }
