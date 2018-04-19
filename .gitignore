@@ -7,3 +7,5 @@ cmd/cddamapgui/vendor*
 cmd/cddamapgui/bind*
 images/cddamap/bin
 images/cddamap/migrations
+*\.exe
+windows.syso

@@ -9,7 +9,7 @@ let index = {
         })
     },
     mapstuff: function() {
-        var zl = 8;
+        var zl = 5;
 
 		var map = L.map('map', {
 			crs: L.CRS.Simple,

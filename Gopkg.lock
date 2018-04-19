@@ -2,6 +2,64 @@
 
 
 [[projects]]
+  branch = "master"
+  name = "github.com/akavel/rsrc"
+  packages = [
+    "binutil",
+    "coff",
+    "ico",
+    "internal",
+    "rsrc"
+  ]
+  revision = "f6a15ece2cfd2560077c556499f19340ddc768e9"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/asticode/go-astilectron"
+  packages = ["."]
+  revision = "758a3ce1f93b110ad8dc0366e5e345b9feca64fa"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/asticode/go-astilectron-bootstrap"
+  packages = ["."]
+  revision = "fc3dcfc48afc3f01e963c7654822dddb426e046f"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/asticode/go-astilectron-bundler"
+  packages = ["."]
+  revision = "551bda73a0fab11243e8c7fcbeef8df01b57206b"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/asticode/go-astilog"
+  packages = ["."]
+  revision = "48409865148a0f397641b786ff35158bba19c48f"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/asticode/go-astitools"
+  packages = [
+    "context",
+    "exec",
+    "http",
+    "io",
+    "os",
+    "ptr",
+    "regexp",
+    "url",
+    "zip"
+  ]
+  revision = "2acd5969b5b8fa4e8d55c2f4adc2b58a77d2d56b"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/asticode/go-bindata"
+  packages = ["."]
+  revision = "a0ff2567cfb70903282db057e799fd826784d41d"
+
+[[projects]]
   name = "github.com/disintegration/imaging"
   packages = ["."]
   revision = "fd34ef7671b12cdf1b024d98c6b327b2770d32c4"
@@ -10,7 +68,11 @@
 [[projects]]
   branch = "master"
   name = "github.com/golang/freetype"
-  packages = [".","raster","truetype"]
+  packages = [
+    ".",
+    "raster",
+    "truetype"
+  ]
   revision = "e2365dfdc4a05e4b8299a783240d4a7d5a65d4e4"
 
 [[projects]]
@@ -40,20 +102,68 @@
 [[projects]]
   branch = "master"
   name = "github.com/jmoiron/sqlx"
-  packages = [".","reflectx"]
+  packages = [
+    ".",
+    "reflectx"
+  ]
   revision = "2aeb6a910c2b94f2d5eb53d9895d80e27264ec41"
+
+[[projects]]
+  name = "github.com/julienschmidt/httprouter"
+  packages = ["."]
+  revision = "8c199fb6259ffc1af525cc3ad52ee60ba8359669"
+  version = "v1.1"
 
 [[projects]]
   branch = "master"
   name = "github.com/lib/pq"
-  packages = [".","oid"]
+  packages = [
+    ".",
+    "oid"
+  ]
   revision = "d34b9ff171c21ad295489235aec8b6626023cd04"
 
 [[projects]]
   name = "github.com/mattes/migrate"
-  packages = [".","database","database/postgres","source","source/file"]
+  packages = [
+    ".",
+    "database",
+    "database/postgres",
+    "source",
+    "source/file"
+  ]
   revision = "035c07716cd373d88456ec4d701402df52584cb4"
   version = "v3.0.1"
+
+[[projects]]
+  name = "github.com/mattn/go-colorable"
+  packages = ["."]
+  revision = "167de6bfdfba052fa6b2d3664c8f5272e23c9072"
+  version = "v0.0.9"
+
+[[projects]]
+  name = "github.com/mattn/go-isatty"
+  packages = ["."]
+  revision = "0360b2af4f38e8d38c7fce2a9f4e702702d73a39"
+  version = "v0.0.3"
+
+[[projects]]
+  name = "github.com/mattn/go-sqlite3"
+  packages = ["."]
+  revision = "6c771bb9887719704b210e87e934f08be014bdb1"
+  version = "v1.6.0"
+
+[[projects]]
+  name = "github.com/paulmach/go.geojson"
+  packages = ["."]
+  revision = "aa3713dea4327980f5891ac781c6f1a45ea75c0f"
+  version = "v1.3.1"
+
+[[projects]]
+  name = "github.com/pkg/errors"
+  packages = ["."]
+  revision = "645ef00459ed84a119197bfb8d8205042c6df63d"
+  version = "v0.8.0"
 
 [[projects]]
   name = "github.com/sirupsen/logrus"
@@ -65,23 +175,32 @@
   branch = "master"
   name = "golang.org/x/crypto"
   packages = ["ssh/terminal"]
-  revision = "beb2a9779c3b677077c41673505f150149fce895"
+  revision = "d6449816ce06963d9d136eee5a56fca5b0616e7e"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/image"
-  packages = ["bmp","font","math/fixed","tiff","tiff/lzw"]
+  packages = [
+    "bmp",
+    "font",
+    "math/fixed",
+    "tiff",
+    "tiff/lzw"
+  ]
   revision = "f315e440302883054d0c2bd85486878cb4f8572c"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/sys"
-  packages = ["unix","windows"]
-  revision = "3b87a42e500a6dc65dae1a55d0b641295971163e"
+  packages = [
+    "unix",
+    "windows"
+  ]
+  revision = "3ccc7e5779793fd54564baf60c51bf017955e0ba"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "9868038fc8891f0370cf79515ad697861510f0801f72296cf4bc6527b750776e"
+  inputs-digest = "2b715f553f18d46011ff2deea50ba77e79b7f872730ad796d2fb6bea5ffde346"
   solver-name = "gps-cdcl"
   solver-version = 1

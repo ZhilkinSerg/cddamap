@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+
 	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/asticode/go-astilectron"
@@ -45,7 +46,7 @@ type cell struct {
 }
 
 func blam(ci cellIndex) (interface{}, error) {
-	db, err := sqlx.Open("sqlite3", "/Users/jj/Desktop/TrinityCenter/map.db")
+	db, err := sqlx.Open("sqlite3", "F:/maps/output/tunis/map.db")
 	if err != nil {
 		return nil, err
 	}
