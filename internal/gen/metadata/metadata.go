@@ -6,7 +6,6 @@ import (
 	"image/color"
 	"io/ioutil"
 	"os"
-	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -274,8 +273,8 @@ func (o Overmap) Name(id string) string {
 func Build(save save.Save, gameRoot string) (Overmap, error) {
 	o := Overmap{}
 
-	jsonRoot := path.Join(gameRoot, "data", "json")
-	modsRoot := path.Join(gameRoot, "data", "mods")
+	jsonRoot := filepath.Join(gameRoot, "data", "json")
+	modsRoot := filepath.Join(gameRoot, "data", "mods")
 	files, err := overmapTerrainSourceFiles(jsonRoot, modsRoot, save.Mods)
 	if err != nil {
 		return o, err
@@ -366,7 +365,7 @@ func overmapTerrainSourceFiles(jsonRoot, modsRoot string, saveMods []string) ([]
 			continue
 		}
 
-		err = filepath.Walk(path.Join(modsRoot, f.Name()), func(path string, info os.FileInfo, err error) error {
+		err = filepath.Walk(filepath.Join(modsRoot, f.Name()), func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				return err
 			}

@@ -214,22 +214,30 @@ func seenToImage(e *png.Encoder, RGBA *image.RGBA, c *freetype.Context, w world.
 			pt.Y += c.PointToFixed(size * spacing)
 		}
 
-		filename := filepath.Join(outputRoot, fmt.Sprintf("%v_visible_%v.png", name, layerID))
-		outFile, err := os.Create(filename)
-		if err != nil {
-			return err
-		}
-		defer outFile.Close()
+		if chop {
+			layerTilesFolder := filepath.Join(outputRoot, fmt.Sprintf("%v_visible_%v_tiles", name, layerID))
+			err := chopIntoTiles(e, layerTilesFolder, RGBA, xCount, yCount, resume)
+			if err != nil {
+				return err
+			}
+		} else {
+			filename := filepath.Join(outputRoot, fmt.Sprintf("%v_visible_%v.png", name, layerID))
+			outFile, err := os.Create(filename)
+			if err != nil {
+				return err
+			}
+			defer outFile.Close()
 
-		b := bufio.NewWriter(outFile)
-		err = e.Encode(b, RGBA)
-		if err != nil {
-			return err
-		}
+			b := bufio.NewWriter(outFile)
+			err = e.Encode(b, RGBA)
+			if err != nil {
+				return err
+			}
 
-		err = b.Flush()
-		if err != nil {
-			return err
+			err = b.Flush()
+			if err != nil {
+				return err
+			}
 		}
 	}
 
@@ -263,22 +271,30 @@ func seenToImageSolid(e *png.Encoder, RGBA *image.RGBA, c *freetype.Context, w w
 			pt.Y += c.PointToFixed(size * spacing)
 		}
 
-		filename := filepath.Join(outputRoot, fmt.Sprintf("%v_visible_solid_%v.png", name, layerID))
-		outFile, err := os.Create(filename)
-		if err != nil {
-			return err
-		}
-		defer outFile.Close()
+		if chop {
+			layerTilesFolder := filepath.Join(outputRoot, fmt.Sprintf("%v_visible_solid_%v_tiles", name, layerID))
+			err := chopIntoTiles(e, layerTilesFolder, RGBA, xCount, yCount, resume)
+			if err != nil {
+				return err
+			}
+		} else {
+			filename := filepath.Join(outputRoot, fmt.Sprintf("%v_visible_solid_%v.png", name, layerID))
+			outFile, err := os.Create(filename)
+			if err != nil {
+				return err
+			}
+			defer outFile.Close()
 
-		b := bufio.NewWriter(outFile)
-		err = e.Encode(b, RGBA)
-		if err != nil {
-			return err
-		}
+			b := bufio.NewWriter(outFile)
+			err = e.Encode(b, RGBA)
+			if err != nil {
+				return err
+			}
 
-		err = b.Flush()
-		if err != nil {
-			return err
+			err = b.Flush()
+			if err != nil {
+				return err
+			}
 		}
 	}
 

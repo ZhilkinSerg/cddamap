@@ -155,6 +155,7 @@ func buildCharacterSeenLayers(m metadata.Overmap, s save.Save) map[string][]Seen
 	seen := make(map[string][]SeenLayer)
 
 	for name, chunks := range s.Seen {
+		fmt.Printf("name: %v\n", name)
 		doneChunks := make(map[int]bool)
 		cells := make([]bool, 680400*chunkCapacity)
 		for _, c := range chunks.Chunks {
@@ -294,8 +295,8 @@ func buildTerrainLayers(m metadata.Overmap, s save.Save, tcl map[uint32]TerrainC
 	}
 
 	emptyRockHash := save.HashTerrainID("empty_rock")
-	openAirHash := save.HashTerrainID("empty_rock")
-	blankHash := save.HashTerrainID("empty_rock")
+	openAirHash := save.HashTerrainID("open_air")
+	blankHash := save.HashTerrainID("")
 
 	for li := 0; li < 21; li++ {
 		empty := true
