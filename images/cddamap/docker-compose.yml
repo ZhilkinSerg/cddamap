@@ -14,7 +14,9 @@ services:
     build: .
     environment:
       - CDDAMAP_CONNECTION_STRING=${CDDAMAP_CONNECTION_STRING}
-    command: cddamap
+    command: cddamap -tileRoot /tiles
+    volumes:
+      - ./tiles:/tiles
     depends_on:
       - db
     ports: 
