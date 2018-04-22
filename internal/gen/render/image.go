@@ -10,6 +10,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"strconv"
 
 	"github.com/disintegration/imaging"
@@ -43,7 +44,7 @@ func init() {
 	colorCache = make(map[color.RGBA]*image.Uniform)
 }
 
-func Image(w world.World, outputRoot string, includeLayers []int, terrain, seen, seenSolid, skipEmpty, chop, resume bool) error {
+func Image(w world.World, outputRoot string, includeLayers []int, terrain, seen, seenSolid, skipEmpty, chop, resume, cities bool) error {
 	err := os.MkdirAll(outputRoot, os.ModePerm)
 	if err != nil {
 		return err
@@ -110,6 +111,12 @@ func Image(w world.World, outputRoot string, includeLayers []int, terrain, seen,
 		}
 	}
 
+	if cities {
+		err := citiesToImage(e, fullImage, c, w, outputRoot, chop, resume, tileXCount, tileYCount)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -195,6 +202,7 @@ func chopIntoTiles(e *png.Encoder, layerFolder string, fullImage *image.RGBA, xC
 	height := bounds.Dy()
 
 	for z := 0; z <= zCount; z++ {
+		debug.FreeOSMemory()
 		zFolder := filepath.Join(layerFolder, strconv.Itoa(z))
 		cover := int(math.Pow(2, float64(zCount-z))) * tileSize
 		txc := int(math.Ceil(float64(width) / float64(cover)))
@@ -375,6 +383,58 @@ func seenToImageSolid(e *png.Encoder, fullImage *image.RGBA, c *freetype.Context
 
 			outFile.Close()
 		}
+	}
+
+	return nil
+}
+
+func citiesToImage(e *png.Encoder, fullImage *image.RGBA, c *freetype.Context, w world.World, outputRoot string, chop, resume bool, xCount, yCount int) error {
+	draw.Draw(fullImage, fullImage.Bounds(), image.Transparent, image.ZP, draw.Src)
+
+	bg := image.NewUniform(color.RGBA{255, 255, 0, 255})
+	fg := image.NewUniform(color.RGBA{0, 0, 0, 255})
+
+	pt := freetype.Pt(0, 0+int(c.PointToFixed(size)>>6))
+	for _, r := range w.CityLayer.CityRows {
+		for _, k := range r.CityCell {
+			if k != "" {
+				draw.Draw(fullImage, image.Rect(int(pt.X>>6), int(pt.Y>>6)+2, int(pt.X>>6)+cellOverprintWidth, int(pt.Y>>6)-cellHeight), bg, image.ZP, draw.Src)
+				c.SetSrc(fg)
+				c.DrawString(k, pt)
+			}
+			pt.X += c.PointToFixed(cellWidth)
+		}
+		pt.X = c.PointToFixed(0)
+		pt.Y += c.PointToFixed(size * spacing)
+	}
+
+	if chop {
+		layerTilesFolder := filepath.Join(outputRoot, "cities_tiles")
+		err := chopIntoTiles(e, layerTilesFolder, fullImage, xCount, yCount, resume)
+		if err != nil {
+			return err
+		}
+	} else {
+		filename := filepath.Join(outputRoot, "cities.png")
+		outFile, err := os.Create(filename)
+		if err != nil {
+			return err
+		}
+
+		b := bufio.NewWriter(outFile)
+		err = e.Encode(b, fullImage)
+		if err != nil {
+			outFile.Close()
+			return err
+		}
+
+		err = b.Flush()
+		if err != nil {
+			outFile.Close()
+			return err
+		}
+
+		outFile.Close()
 	}
 
 	return nil

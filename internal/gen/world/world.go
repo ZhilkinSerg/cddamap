@@ -35,6 +35,7 @@ type World struct {
 	SeenLayers        map[string][]SeenLayer
 	TerrainCellLookup map[uint32]TerrainCell
 	SeenCellLookup    map[bool]SeenCell
+	CityLayer         CityLayer
 }
 
 type TerrainLayer struct {
@@ -71,6 +72,22 @@ type SeenCell struct {
 	ColorBG color.RGBA
 }
 
+type CityLayer struct {
+	CityRows []CityRow
+	Cities   []City
+}
+
+type CityRow struct {
+	CityCell []string
+}
+
+type City struct {
+	Name string
+	X    int
+	Y    int
+	Size int
+}
+
 func Build(m metadata.Overmap, s save.Save) (World, error) {
 
 	terrainCellLookup := make(map[uint32]TerrainCell)
@@ -92,6 +109,7 @@ func Build(m metadata.Overmap, s save.Save) (World, error) {
 
 	terrainLayers := buildTerrainLayers(m, s, terrainCellLookup)
 	characterSeenLayers := buildCharacterSeenLayers(m, s)
+	cityLayer := buildCityLayer(m, s)
 
 	world := World{
 		Name:              s.Name,
@@ -99,6 +117,7 @@ func Build(m metadata.Overmap, s save.Save) (World, error) {
 		SeenLayers:        characterSeenLayers,
 		TerrainCellLookup: terrainCellLookup,
 		SeenCellLookup:    seenCellLookup,
+		CityLayer:         cityLayer,
 	}
 
 	return world, nil
@@ -148,6 +167,55 @@ func calculateWorldChunkDimensions(m metadata.Overmap, s save.Save) worldChunkDi
 	return wcd
 }
 
+func buildCityLayer(m metadata.Overmap, s save.Save) CityLayer {
+	wcd := calculateWorldChunkDimensions(m, s)
+	chunkCapacity := wcd.XSize * wcd.YSize
+
+	cities := make([]City, 0)
+	cells := make([]string, 32400*chunkCapacity)
+
+	for _, c := range s.Overmap.Chunks {
+		ci := c.X + (0 - wcd.XMin) + wcd.XSize*(c.Y+0-wcd.YMin)
+		for _, city := range c.Cities {
+
+			ce := City{
+				Name: city.Name,
+				Size: city.Size,
+				X:    (c.X+(0-wcd.XMin))*180 + city.X,
+				Y:    (c.Y+0-wcd.YMin)*180 + city.Y,
+			}
+
+			cities = append(cities, ce)
+
+			nameStart := ci*32400 + city.Y*180 + city.X - len(city.Name)/2
+			for i := 0; i < len(city.Name); i++ {
+				cells[nameStart+i] = string(city.Name[i])
+			}
+		}
+	}
+
+	layer := CityLayer{
+		Cities: cities,
+	}
+	layer.CityRows = make([]CityRow, 180*wcd.YSize)
+	for r := 0; r < 180*wcd.YSize; r++ {
+		layer.CityRows[r].CityCell = make([]string, 180*wcd.XSize)
+	}
+
+	for xi := 0; xi < wcd.XSize; xi++ {
+		for yi := 0; yi < wcd.YSize; yi++ {
+			for ri := 0; ri < 180; ri++ {
+				for ci := 0; ci < 180; ci++ {
+					cell := cells[(xi+yi*wcd.XSize)*32400+ri*180+ci]
+					layer.CityRows[yi*180+ri].CityCell[xi*180+ci] = cell
+				}
+			}
+		}
+	}
+
+	return layer
+}
+
 func buildCharacterSeenLayers(m metadata.Overmap, s save.Save) map[string][]SeenLayer {
 	wcd := calculateWorldChunkDimensions(m, s)
 	chunkCapacity := wcd.XSize * wcd.YSize
@@ -155,7 +223,6 @@ func buildCharacterSeenLayers(m metadata.Overmap, s save.Save) map[string][]Seen
 	seen := make(map[string][]SeenLayer)
 
 	for name, chunks := range s.Seen {
-		fmt.Printf("name: %v\n", name)
 		doneChunks := make(map[int]bool)
 		cells := make([]bool, 680400*chunkCapacity)
 		for _, c := range chunks.Chunks {

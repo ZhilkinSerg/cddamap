@@ -30,7 +30,7 @@ type OvermapChunk struct {
 	Layers [][]TerrainGroup `json:"layers"`
 	//RegionID string           `json:"region_id"`
 	//MonsterGroups   string `json:"monster_groups"`
-	//Cities          string `json:"cities"`
+	Cities []City `json:"cities"`
 	//RoadsOut        string `json:"roads_out"`
 	//Radios          string `json:"radios"`
 	//MonsterMap      string `json:"monster_map"`
@@ -42,6 +42,13 @@ type OvermapChunk struct {
 type TerrainGroup struct {
 	OvermapTerrainID string
 	Count            float64
+}
+
+type City struct {
+	Name string `json:"name"`
+	X    int    `json:"x"`
+	Y    int    `json:"y"`
+	Size int    `json:"size"`
 }
 
 type Seen struct {

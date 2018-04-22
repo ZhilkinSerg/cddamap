@@ -9,7 +9,7 @@ import (
 	"github.com/ralreegorganon/cddamap/internal/gen/world"
 )
 
-func Text(w world.World, outputRoot string, includeLayers []int, terrain, seen, skipEmpty bool) error {
+func Text(w world.World, outputRoot string, includeLayers []int, terrain, seen, skipEmpty, cities bool) error {
 	err := os.MkdirAll(outputRoot, os.ModePerm)
 	if err != nil {
 		return err
@@ -27,6 +27,13 @@ func Text(w world.World, outputRoot string, includeLayers []int, terrain, seen, 
 			if err != nil {
 				return err
 			}
+		}
+	}
+
+	if cities {
+		err = cityToText(w, outputRoot)
+		if err != nil {
+			return err
 		}
 	}
 	return nil
@@ -86,5 +93,29 @@ func seenToText(w world.World, outputRoot string, layerID int, skipEmpty bool) e
 
 		f.WriteString(b.String())
 	}
+	return nil
+}
+
+func cityToText(w world.World, outputRoot string) error {
+	var b strings.Builder
+	for _, r := range w.CityLayer.CityRows {
+		for _, k := range r.CityCell {
+			if k == "" {
+				b.WriteString(" ")
+			} else {
+				b.WriteString(k)
+			}
+		}
+		b.WriteString("\n")
+	}
+
+	filename := filepath.Join(outputRoot, "cities")
+	f, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	f.WriteString(b.String())
 	return nil
 }
