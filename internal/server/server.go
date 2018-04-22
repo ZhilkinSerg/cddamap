@@ -16,10 +16,10 @@ func CreateRouter(server *HTTPServer) (*mux.Router, error) {
 	r := mux.NewRouter()
 	m := map[string]map[string]HttpApiFunc{
 		"GET": {
-			"/api/worlds":                                                                                 server.GetWorlds,
-			"/api/worlds/{worldID:[0-9]+}":                                                                server.GetWorldLayerInfo,
-			"/api/worlds/{worldID:[0-9]+}/layers/{layerID:[0-9]+}/cells/{x}/{y}":                          server.GetCells,
-			"/api/worlds/{worldID:[0-9]+}/layers/{layerID:[0-9]+}/tiles/{z:[0-9]+}/{x:[0-9]+}/{y:[0-9]+}": server.GetTile,
+			"/api/worlds":                                                                                     server.GetWorlds,
+			"/api/worlds/{worldID:[0-9]+}":                                                                    server.GetWorldLayerInfo,
+			"/api/worlds/{worldID:[0-9]+}/layers/{layerID:[0-9]+}/cells/{x}/{y}":                              server.GetCells,
+			"/api/worlds/{worldID:[0-9]+}/layers/{layerID:[0-9]+}/tiles/{z:[0-9]+}/{x:[0-9]+}/{y:[0-9]+}.png": server.GetTile,
 		},
 		"POST": {},
 		"PUT":  {},
