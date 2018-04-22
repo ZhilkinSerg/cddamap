@@ -159,18 +159,21 @@ func terrainToImage(e *png.Encoder, fullImage *image.RGBA, c *freetype.Context, 
 		if err != nil {
 			return err
 		}
-		defer outFile.Close()
 
 		b := bufio.NewWriter(outFile)
 		err = e.Encode(b, fullImage)
 		if err != nil {
+			outFile.Close()
 			return err
 		}
 
 		err = b.Flush()
 		if err != nil {
+			outFile.Close()
 			return err
 		}
+
+		outFile.Close()
 	}
 
 	return nil
@@ -296,18 +299,21 @@ func seenToImage(e *png.Encoder, fullImage *image.RGBA, c *freetype.Context, w w
 			if err != nil {
 				return err
 			}
-			defer outFile.Close()
 
 			b := bufio.NewWriter(outFile)
 			err = e.Encode(b, fullImage)
 			if err != nil {
+				outFile.Close()
 				return err
 			}
 
 			err = b.Flush()
 			if err != nil {
+				outFile.Close()
 				return err
 			}
+
+			outFile.Close()
 		}
 	}
 
@@ -353,18 +359,21 @@ func seenToImageSolid(e *png.Encoder, fullImage *image.RGBA, c *freetype.Context
 			if err != nil {
 				return err
 			}
-			defer outFile.Close()
 
 			b := bufio.NewWriter(outFile)
 			err = e.Encode(b, fullImage)
 			if err != nil {
+				outFile.Close()
 				return err
 			}
 
 			err = b.Flush()
 			if err != nil {
+				outFile.Close()
 				return err
 			}
+
+			outFile.Close()
 		}
 	}
 
