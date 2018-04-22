@@ -86,7 +86,7 @@ func main() {
 	}
 
 	if opts.DBConnectionString != "" {
-		err = render.GIS(w, opts.DBConnectionString, opts.Layers, opts.Terrain, opts.Seen, opts.SeenSolid, opts.SkipEmpty)
+		err = render.GIS(w, opts.DBConnectionString, opts.Layers, opts.Terrain, opts.Seen, opts.SeenSolid, opts.SkipEmpty, opts.Cities)
 		if err != nil {
 			log.Fatal(err)
 		}

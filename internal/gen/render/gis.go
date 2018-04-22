@@ -11,7 +11,7 @@ import (
 	"github.com/ralreegorganon/cddamap/internal/gen/world"
 )
 
-func GIS(w world.World, connectionString string, includeLayers []int, terrain, seen, seenSolid, skipEmpty bool) error {
+func GIS(w world.World, connectionString string, includeLayers []int, terrain, seen, seenSolid, skipEmpty, cities bool) error {
 	tl := w.TerrainLayers[includeLayers[0]]
 	width := int(cellWidth * float64(len(tl.TerrainRows[0].TerrainCellKeys)))
 	height := cellHeight * len(tl.TerrainRows)
@@ -158,5 +158,53 @@ func GIS(w world.World, connectionString string, includeLayers []int, terrain, s
 			}
 		}
 	}
+
+	if cities {
+		txn, err := db.Begin()
+		if err != nil {
+			return err
+		}
+
+		nukeCitiesStmt, err := txn.Prepare("delete from city where world_id = $1")
+		if err != nil {
+			return err
+		}
+
+		_, err = nukeCitiesStmt.Exec(worldID)
+		if err != nil {
+			return err
+		}
+
+		stmt, err := txn.Prepare(pq.CopyIn("city", "world_id", "name", "size", "the_geom"))
+		if err != nil {
+			return err
+		}
+
+		for _, c := range w.CityLayer.Cities {
+			x := float64(c.X)*cellWidth + cellWidth/2
+			y := float64(c.Y)*float64(cellHeight) + float64(cellWidth)/2
+
+			geom := fmt.Sprintf("POINT(%[1]f %[2]f)", x, y)
+			_, err = stmt.Exec(worldID, c.Name, c.Size, geom)
+			if err != nil {
+				return err
+			}
+		}
+		_, err = stmt.Exec()
+		if err != nil {
+			return err
+		}
+
+		err = stmt.Close()
+		if err != nil {
+			return err
+		}
+
+		err = txn.Commit()
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
