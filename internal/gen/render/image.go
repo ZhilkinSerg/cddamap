@@ -7,13 +7,9 @@ import (
 	"image/color"
 	"image/draw"
 	"image/png"
-	"math"
 	"os"
 	"path/filepath"
-	"runtime/debug"
-	"strconv"
 
-	"github.com/disintegration/imaging"
 	"github.com/golang/freetype"
 	"github.com/golang/freetype/truetype"
 	"github.com/ralreegorganon/cddamap/internal/gen/world"
@@ -28,7 +24,6 @@ var cellHeight = 24
 var cellOverprintWidth = 22
 var mapFont *truetype.Font
 var colorCache map[color.RGBA]*image.Uniform
-var tileSize = 256
 
 func init() {
 	fontBytes, err := Asset("Topaz-8.ttf")
@@ -44,7 +39,7 @@ func init() {
 	colorCache = make(map[color.RGBA]*image.Uniform)
 }
 
-func Image(w world.World, outputRoot string, includeLayers []int, terrain, seen, seenSolid, skipEmpty, chop, resume, cities bool) error {
+func Image(w world.World, outputRoot string, includeLayers []int, terrain, seen, seenSolid, skipEmpty, cities bool) error {
 	err := os.MkdirAll(outputRoot, os.ModePerm)
 	if err != nil {
 		return err
@@ -63,21 +58,6 @@ func Image(w world.World, outputRoot string, includeLayers []int, terrain, seen,
 	width := int(cellWidth * float64(len(l.TerrainRows[0].TerrainCellKeys)))
 	height := cellHeight * len(l.TerrainRows)
 
-	tileXCount := int(math.Ceil(float64(width) / float64(tileSize)))
-	tileYCount := int(math.Ceil(float64(height) / float64(tileSize)))
-	if chop {
-		xPaddingRequired := tileXCount*tileSize - width
-		yPaddingRequired := tileYCount*tileSize - height
-
-		if xPaddingRequired > 0 {
-			width += xPaddingRequired
-		}
-
-		if yPaddingRequired > 0 {
-			height += yPaddingRequired
-		}
-	}
-
 	fullImage := image.NewRGBA(image.Rect(0, 0, width, height))
 
 	c := freetype.NewContext()
@@ -90,21 +70,21 @@ func Image(w world.World, outputRoot string, includeLayers []int, terrain, seen,
 
 	for _, layerID := range includeLayers {
 		if terrain {
-			err := terrainToImage(e, fullImage, c, w, outputRoot, layerID, skipEmpty, chop, resume, tileXCount, tileYCount)
+			err := terrainToImage(e, fullImage, c, w, outputRoot, layerID, skipEmpty)
 			if err != nil {
 				return err
 			}
 		}
 
 		if seen {
-			err := seenToImage(e, fullImage, c, w, outputRoot, layerID, skipEmpty, chop, resume, tileXCount, tileYCount)
+			err := seenToImage(e, fullImage, c, w, outputRoot, layerID, skipEmpty)
 			if err != nil {
 				return err
 			}
 		}
 
 		if seenSolid {
-			err := seenToImageSolid(e, fullImage, c, w, outputRoot, layerID, skipEmpty, chop, resume, tileXCount, tileYCount)
+			err := seenToImageSolid(e, fullImage, c, w, outputRoot, layerID, skipEmpty)
 			if err != nil {
 				return err
 			}
@@ -112,7 +92,7 @@ func Image(w world.World, outputRoot string, includeLayers []int, terrain, seen,
 	}
 
 	if cities {
-		err := citiesToImage(e, fullImage, c, w, outputRoot, chop, resume, tileXCount, tileYCount)
+		err := citiesToImage(e, fullImage, c, w, outputRoot)
 		if err != nil {
 			return err
 		}
@@ -120,7 +100,7 @@ func Image(w world.World, outputRoot string, includeLayers []int, terrain, seen,
 	return nil
 }
 
-func terrainToImage(e *png.Encoder, fullImage *image.RGBA, c *freetype.Context, w world.World, outputRoot string, layerID int, skipEmpty, chop, resume bool, xCount, yCount int) error {
+func terrainToImage(e *png.Encoder, fullImage *image.RGBA, c *freetype.Context, w world.World, outputRoot string, layerID int, skipEmpty bool) error {
 	l := w.TerrainLayers[layerID]
 
 	if l.Empty && skipEmpty {
@@ -154,113 +134,39 @@ func terrainToImage(e *png.Encoder, fullImage *image.RGBA, c *freetype.Context, 
 		pt.Y += c.PointToFixed(size * spacing)
 	}
 
-	if chop {
-		layerTilesFolder := filepath.Join(outputRoot, fmt.Sprintf("o_%v_tiles", layerID))
-		err := chopIntoTiles(e, layerTilesFolder, fullImage, xCount, yCount, resume)
-		if err != nil {
-			return err
-		}
-	} else {
-		filename := filepath.Join(outputRoot, fmt.Sprintf("o_%v.png", layerID))
-		outFile, err := os.Create(filename)
-		if err != nil {
-			return err
-		}
-
-		b := bufio.NewWriter(outFile)
-		err = e.Encode(b, fullImage)
-		if err != nil {
-			outFile.Close()
-			return err
-		}
-
-		err = b.Flush()
-		if err != nil {
-			outFile.Close()
-			return err
-		}
-
-		outFile.Close()
-	}
-
-	return nil
-}
-
-func nativeZoom(xCount, yCount int) int {
-	return int(math.Max(math.Ceil(math.Log2(float64(xCount))), math.Ceil(math.Log2(float64(yCount)))))
-}
-
-func chopIntoTiles(e *png.Encoder, layerFolder string, fullImage *image.RGBA, xCount, yCount int, resume bool) error {
-	err := os.MkdirAll(layerFolder, os.ModePerm)
+	filename := filepath.Join(outputRoot, fmt.Sprintf("o_%v.png", layerID))
+	err := write(filename, e, fullImage)
 	if err != nil {
 		return err
 	}
 
-	zCount := nativeZoom(xCount, yCount)
-	bounds := fullImage.Bounds()
-	width := bounds.Dx()
-	height := bounds.Dy()
-
-	for z := 0; z <= zCount; z++ {
-		debug.FreeOSMemory()
-		zFolder := filepath.Join(layerFolder, strconv.Itoa(z))
-		cover := int(math.Pow(2, float64(zCount-z))) * tileSize
-		txc := int(math.Ceil(float64(width) / float64(cover)))
-		tyc := int(math.Ceil(float64(height) / float64(cover)))
-		tile := image.NewRGBA(image.Rect(0, 0, cover, cover))
-		tileBounds := tile.Bounds()
-
-		for x := 0; x < txc; x++ {
-			xFolder := filepath.Join(zFolder, strconv.Itoa(x))
-			err := os.MkdirAll(xFolder, os.ModePerm)
-			if err != nil {
-				return err
-			}
-
-			for y := 0; y < tyc; y++ {
-				filename := filepath.Join(xFolder, fmt.Sprintf("%v.png", y))
-
-				if _, err := os.Stat(filename); resume && !os.IsNotExist(err) {
-					continue
-				}
-
-				draw.Draw(tile, tileBounds, image.Transparent, image.ZP, draw.Src)
-				clipRect := image.Rect(x*cover, y*cover, x*cover+cover, y*cover+cover)
-				draw.Draw(tile, tileBounds, fullImage, clipRect.Min, draw.Src)
-
-				outFile, err := os.Create(filename)
-				if err != nil {
-					return err
-				}
-
-				b := bufio.NewWriter(outFile)
-				if tileSize == cover {
-					err = e.Encode(b, tile)
-					if err != nil {
-						outFile.Close()
-						return err
-					}
-				} else {
-					resizedTile := imaging.Resize(tile, tileSize, tileSize, imaging.Lanczos)
-					err = e.Encode(b, resizedTile)
-					if err != nil {
-						outFile.Close()
-						return err
-					}
-				}
-				err = b.Flush()
-				if err != nil {
-					return err
-				}
-				outFile.Close()
-			}
-		}
-	}
-
 	return nil
 }
 
-func seenToImage(e *png.Encoder, fullImage *image.RGBA, c *freetype.Context, w world.World, outputRoot string, layerID int, skipEmpty, chop, resume bool, xCount, yCount int) error {
+func write(filename string, e *png.Encoder, fullImage *image.RGBA) error {
+	outFile, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+
+	b := bufio.NewWriter(outFile)
+	err = e.Encode(b, fullImage)
+	if err != nil {
+		outFile.Close()
+		return err
+	}
+
+	err = b.Flush()
+	if err != nil {
+		outFile.Close()
+		return err
+	}
+
+	outFile.Close()
+	return nil
+}
+
+func seenToImage(e *png.Encoder, fullImage *image.RGBA, c *freetype.Context, w world.World, outputRoot string, layerID int, skipEmpty bool) error {
 	for name, layers := range w.SeenLayers {
 		l := layers[layerID]
 
@@ -295,40 +201,17 @@ func seenToImage(e *png.Encoder, fullImage *image.RGBA, c *freetype.Context, w w
 			pt.Y += c.PointToFixed(size * spacing)
 		}
 
-		if chop {
-			layerTilesFolder := filepath.Join(outputRoot, fmt.Sprintf("%v_visible_%v_tiles", name, layerID))
-			err := chopIntoTiles(e, layerTilesFolder, fullImage, xCount, yCount, resume)
-			if err != nil {
-				return err
-			}
-		} else {
-			filename := filepath.Join(outputRoot, fmt.Sprintf("%v_visible_%v.png", name, layerID))
-			outFile, err := os.Create(filename)
-			if err != nil {
-				return err
-			}
-
-			b := bufio.NewWriter(outFile)
-			err = e.Encode(b, fullImage)
-			if err != nil {
-				outFile.Close()
-				return err
-			}
-
-			err = b.Flush()
-			if err != nil {
-				outFile.Close()
-				return err
-			}
-
-			outFile.Close()
+		filename := filepath.Join(outputRoot, fmt.Sprintf("%v_visible_%v.png", name, layerID))
+		err := write(filename, e, fullImage)
+		if err != nil {
+			return err
 		}
 	}
 
 	return nil
 }
 
-func seenToImageSolid(e *png.Encoder, fullImage *image.RGBA, c *freetype.Context, w world.World, outputRoot string, layerID int, skipEmpty, chop, resume bool, xCount, yCount int) error {
+func seenToImageSolid(e *png.Encoder, fullImage *image.RGBA, c *freetype.Context, w world.World, outputRoot string, layerID int, skipEmpty bool) error {
 	for name, layers := range w.SeenLayers {
 		l := layers[layerID]
 
@@ -355,40 +238,17 @@ func seenToImageSolid(e *png.Encoder, fullImage *image.RGBA, c *freetype.Context
 			pt.Y += c.PointToFixed(size * spacing)
 		}
 
-		if chop {
-			layerTilesFolder := filepath.Join(outputRoot, fmt.Sprintf("%v_visible_solid_%v_tiles", name, layerID))
-			err := chopIntoTiles(e, layerTilesFolder, fullImage, xCount, yCount, resume)
-			if err != nil {
-				return err
-			}
-		} else {
-			filename := filepath.Join(outputRoot, fmt.Sprintf("%v_visible_solid_%v.png", name, layerID))
-			outFile, err := os.Create(filename)
-			if err != nil {
-				return err
-			}
-
-			b := bufio.NewWriter(outFile)
-			err = e.Encode(b, fullImage)
-			if err != nil {
-				outFile.Close()
-				return err
-			}
-
-			err = b.Flush()
-			if err != nil {
-				outFile.Close()
-				return err
-			}
-
-			outFile.Close()
+		filename := filepath.Join(outputRoot, fmt.Sprintf("%v_visible_solid_%v.png", name, layerID))
+		err := write(filename, e, fullImage)
+		if err != nil {
+			return err
 		}
 	}
 
 	return nil
 }
 
-func citiesToImage(e *png.Encoder, fullImage *image.RGBA, c *freetype.Context, w world.World, outputRoot string, chop, resume bool, xCount, yCount int) error {
+func citiesToImage(e *png.Encoder, fullImage *image.RGBA, c *freetype.Context, w world.World, outputRoot string) error {
 	draw.Draw(fullImage, fullImage.Bounds(), image.Transparent, image.ZP, draw.Src)
 
 	bg := image.NewUniform(color.RGBA{255, 255, 0, 255})
@@ -408,33 +268,10 @@ func citiesToImage(e *png.Encoder, fullImage *image.RGBA, c *freetype.Context, w
 		pt.Y += c.PointToFixed(size * spacing)
 	}
 
-	if chop {
-		layerTilesFolder := filepath.Join(outputRoot, "cities_tiles")
-		err := chopIntoTiles(e, layerTilesFolder, fullImage, xCount, yCount, resume)
-		if err != nil {
-			return err
-		}
-	} else {
-		filename := filepath.Join(outputRoot, "cities.png")
-		outFile, err := os.Create(filename)
-		if err != nil {
-			return err
-		}
-
-		b := bufio.NewWriter(outFile)
-		err = e.Encode(b, fullImage)
-		if err != nil {
-			outFile.Close()
-			return err
-		}
-
-		err = b.Flush()
-		if err != nil {
-			outFile.Close()
-			return err
-		}
-
-		outFile.Close()
+	filename := filepath.Join(outputRoot, "cities.png")
+	err := write(filename, e, fullImage)
+	if err != nil {
+		return err
 	}
 
 	return nil

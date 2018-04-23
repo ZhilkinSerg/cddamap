@@ -27,8 +27,6 @@ var opts struct {
 	SeenSolid          bool   `short:"d" long:"seensolid" description:"Render seen as a solid overlay"`
 	Cities             bool   `short:"C" long:"cities" description:"Render city names"`
 	SkipEmpty          bool   `short:"k" long:"skipempty" description:"Skip rendering empty layers"`
-	Chop               bool   `short:"p" long:"chop" description:"Chop images into tiles instead of rendering as a single image"`
-	Resume             bool   `short:"z" long:"resume" description:"Resume tile building, instead of overwriting"`
 }
 
 func init() {
@@ -79,7 +77,7 @@ func main() {
 	}
 
 	if opts.Images {
-		err = render.Image(w, opts.OutputDir, opts.Layers, opts.Terrain, opts.Seen, opts.SeenSolid, opts.SkipEmpty, opts.Chop, opts.Resume, opts.Cities)
+		err = render.Image(w, opts.OutputDir, opts.Layers, opts.Terrain, opts.Seen, opts.SeenSolid, opts.SkipEmpty, opts.Cities)
 		if err != nil {
 			log.Fatal(err)
 		}

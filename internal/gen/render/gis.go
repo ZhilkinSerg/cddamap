@@ -208,3 +208,9 @@ func GIS(w world.World, connectionString string, includeLayers []int, terrain, s
 
 	return nil
 }
+
+func nativeZoom(xCount, yCount int) int {
+	return int(math.Max(math.Ceil(math.Log2(float64(xCount))), math.Ceil(math.Log2(float64(yCount)))))
+}
+
+var tileSize = 256
