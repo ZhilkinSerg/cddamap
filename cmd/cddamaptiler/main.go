@@ -12,8 +12,9 @@ import (
 )
 
 var opts struct {
-	ImageDirectory string `short:"i" long:"images" description:"Images to tile"`
-	Resume         bool   `short:"z" long:"resume" description:"Resume tile building, instead of overwriting"`
+	ImageDirectory string   `short:"I" long:"imageDirectory" description:"Image directory to tile"`
+	ImageFiles     []string `short:"i" long:"images" description:"Images to tile"`
+	Resume         bool     `short:"z" long:"resume" description:"Resume tile building, instead of overwriting"`
 }
 
 func init() {
@@ -33,12 +34,21 @@ func main() {
 		os.Exit(1)
 	}
 
-	files, err := filepath.Glob(filepath.Join(opts.ImageDirectory, "*.png"))
-	if err != nil {
-		log.Fatal(err)
+	if opts.ImageDirectory != "" {
+		files, err := filepath.Glob(filepath.Join(opts.ImageDirectory, "*.png"))
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		for _, f := range files {
+			err := tile.ChopChop(f, opts.Resume)
+			if err != nil {
+				log.Fatal(err)
+			}
+		}
 	}
 
-	for _, f := range files {
+	for _, f := range opts.ImageFiles {
 		err := tile.ChopChop(f, opts.Resume)
 		if err != nil {
 			log.Fatal(err)
