@@ -181,6 +181,7 @@ func (s *HTTPServer) GetTile(w http.ResponseWriter, r *http.Request, vars map[st
 
 	t, err := s.DB.GetTileRoot(layerID)
 	if err != nil {
+		log.WithField("err", err).Error("db error")
 		w.WriteHeader(http.StatusNotFound)
 		return nil
 	}
@@ -190,6 +191,7 @@ func (s *HTTPServer) GetTile(w http.ResponseWriter, r *http.Request, vars map[st
 	f, err := os.Open(tile)
 	defer f.Close()
 	if err != nil {
+		log.WithField("err", err).Error("file error")
 		w.WriteHeader(http.StatusNotFound)
 		return nil
 	}
