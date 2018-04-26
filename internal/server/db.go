@@ -12,7 +12,7 @@ type DB struct {
 }
 
 func (db *DB) Open(connectionString string) error {
-	d, err := sqlx.Open("postgres", connectionString)
+	d, err := sqlx.Connect("postgres", connectionString)
 	if err != nil {
 		return err
 	}
