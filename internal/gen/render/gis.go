@@ -160,6 +160,17 @@ func GIS(w world.World, connectionString string, includeLayers []int, terrain, s
 	}
 
 	if cities {
+		var layerID int
+		err = db.QueryRow("select layer_id from layer where world_id = $1 and z = $2 and type = 'city'", worldID, 10).Scan(&layerID)
+		if err == sql.ErrNoRows {
+			err = db.QueryRow("insert into layer (world_id, z, type) values ($1, $2, 'city') returning layer_id", worldID, 10).Scan(&layerID)
+			if err != nil {
+				return err
+			}
+		} else if err != nil {
+			return err
+		}
+
 		txn, err := db.Begin()
 		if err != nil {
 			return err
